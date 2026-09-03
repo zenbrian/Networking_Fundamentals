@@ -19,4 +19,8 @@ struct ethernet_hdr {
 void ethernet_print_mac(const uint8_t *mac);
 void ethernet_print_header(const struct ethernet_hdr *hdr);
 
+int ethernet_is_broadcast(const uint8_t *mac);
+int ethernet_is_for_me(const uint8_t *mac);
+int ethernet_accept_frame(const struct ethernet_hdr *hdr);
+
 #endif

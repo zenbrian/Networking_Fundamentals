@@ -67,6 +67,12 @@ int main()
 
         struct ethernet_hdr *eth = (struct ethernet_hdr *)buffer;
 
+        if (!ethernet_accept_frame(eth)) {
+            printf("[DROP] Not for me\n");
+            continue;
+        }
+
+        printf("[ACCEPT]\n");
         ethernet_print_header(eth);
         printf("Frame length: %d bytes\n\n", n);
     }
