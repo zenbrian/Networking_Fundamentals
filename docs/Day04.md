@@ -118,6 +118,12 @@ Destination MAC
 
 ARP 採用廣播方式進行查詢。
 
+在送出一般 IPv4 封包之前，主機需要先知道目標 IP 對應到哪一個 MAC Address。當這個對應關係還不存在時，就會先發出 ARP Request，透過 Ethernet Broadcast 問同一個區域網路中的所有設備。
+
+![Day04 ARP Request 查詢流程](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day04/Day04_1.png)
+
+這張圖可以看到 ARP Request 的核心概念：發送端已經知道目標 IP，但還不知道目標 MAC，因此會把 Ethernet Destination MAC 設成 `ff:ff:ff:ff:ff:ff`，讓區域網路內的所有設備都能收到這個查詢。真正擁有該 IP 的設備，才會在下一步回覆自己的 MAC Address。
+
 流程如下：
 
 ```text

@@ -4,3 +4,15 @@ send_arp_reply
 send_ipv4
 send_icmp
 *.o
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Generated images / scratch outputs
+generated/
+outputs/
+
+# Local utility scripts
+scripts/generate-image.js

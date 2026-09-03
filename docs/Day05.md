@@ -3,6 +3,12 @@
 昨天我們完成了發送 **ARP Request** (`Who has 10.0.0.1? Tell 10.0.0.2`)。
 今天我們完成了 ARP 協定的另一半：接收與解析 **ARP Reply**，並建立了網路堆疊的第一個快取記憶庫 ── **ARP Table**，同時具備自動回應 **ARP Request** 的能力。
 
+在 Day04 中，我們已經能送出 ARP Request 詢問「誰擁有這個 IP？」；Day05 則接著處理對方回覆後的學習流程：解析 ARP Reply、記住 IP/MAC 對應，並在後續傳送封包時查詢 ARP Table。
+
+![Day05 ARP Request 到 ARP Table 的學習流程](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day05/Day05_1.png)
+
+有了 ARP Table 之後，Network Stack 就不再只是單純收發封包，而是開始具備「記憶網路狀態」的能力：它可以把學到的位址對應快取起來，讓後續封包能直接找到正確的 Destination MAC。
+
 ```text
 ARP Request
       ↓
