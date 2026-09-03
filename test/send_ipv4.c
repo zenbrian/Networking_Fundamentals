@@ -5,13 +5,15 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <net/if.h>
+#include <netinet/if_ether.h>
 #include <netpacket/packet.h>
 
 #include "config.h"
 #include "ethernet.h"
 #include "ipv4.h"
+#include "checksum.h"
 
-int main()
+int main(int argc, char *argv[])
 {
     int sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (sockfd < 0) {
@@ -50,13 +52,23 @@ int main()
     ip->flags_fragment = 0;
     ip->ttl = 64;
     ip->protocol = IPPROTO_ICMP; // 1
-    ip->checksum = 0;
     ip->src_ip = inet_addr("10.0.0.1");
     ip->dst_ip = inet_addr("10.0.0.2");
 
+    // 計算 IPv4 Header Checksum
+    ip->checksum = 0;
+    ip->checksum = ipv4_checksum(ip, sizeof(struct ipv4_hdr));
+
+    // 支援測試 2：刻意竄改 TTL 模擬損壞封包
+    if (argc > 1 && (strcmp(argv[1], "corrupt") == 0 || strcmp(argv[1], "--bad-ttl") == 0)) {
+        printf("[Test Mode] Corrupting packet: modifying TTL from 64 to 63 without recalculating checksum...\n");
+        ip->ttl = 63;
+    }
+
     int len = sizeof(frame);
 
-    printf("Sending IPv4 packet via Raw Socket: 10.0.0.1 -> 10.0.0.2...\n");
+    printf("Sending IPv4 packet via Raw Socket: 10.0.0.1 -> 10.0.0.2 (TTL: %u, Checksum: 0x%04x)...\n",
+           ip->ttl, ntohs(ip->checksum));
 
     if (sendto(sockfd, frame, len, 0, (struct sockaddr *)&sll, sizeof(sll)) < 0) {
         perror("sendto");
