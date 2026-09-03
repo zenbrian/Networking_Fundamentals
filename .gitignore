@@ -3,6 +3,7 @@ send_arp
 send_arp_reply
 send_ipv4
 send_icmp
+test_routing
 *.o
 
 # Local secrets

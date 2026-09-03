@@ -14,6 +14,8 @@
 #include "ipv4.h"
 #include "icmp.h"
 #include "checksum.h"
+#include "routing.h"  // <-- 引入 routing 標頭檔
+#include "config.h"   // <-- 引入 LOCAL_IP 定義
 
 int tun_alloc(char *dev)
 {
@@ -62,7 +64,15 @@ int main()
     unsigned char buffer[2048];
 
     int fd = tun_alloc(dev);
+    
+    // ARP table 初始化
     arp_table_init();
+    
+    // 路由表初始化
+    routing_init();
+    routing_add(inet_addr("10.0.0.0"), inet_addr("255.255.255.0"), 0); // 區網直連
+    routing_add(inet_addr("0.0.0.0"), inet_addr("0.0.0.0"), inet_addr("10.0.0.1")); // 預設閘道
+    routing_dump(); // 印出路由表
 
     printf("TAP device: %s (UP)\n", dev);
     printf("Ethernet header size: %lu bytes\n", sizeof(struct ethernet_hdr));
@@ -115,17 +125,42 @@ int main()
                         fflush(stdout);
                         break; // 跳出 switch，不往下處理 protocol
                     }
-
-                    // IPv4 Protocol Dispatcher
-                    switch (ip->protocol) {
-                        case IPPROTO_ICMP:
-                            icmp_receive(fd, buffer, n);
+                    // --- 從這裡開始加入 Routing 判斷 ---
+                    uint32_t my_ip = *(uint32_t *)LOCAL_IP; // 10.0.0.2
+                    if (ip->dst_ip == my_ip) {
+                        // 目的 IP 是我：Local Delivery 本地接收
+                        printf("[IPv4] Local Delivery (for me)\n");
+                        fflush(stdout);
+                        // IPv4 Protocol Dispatcher
+                        switch (ip->protocol) {
+                            case IPPROTO_ICMP:
+                                icmp_receive(fd, buffer, n);
+                                break;
+                            default:
+                                break;
+                        }
+                    }else {
+                        // 目的 IP 不是我：進入 Routing 路由查詢！
+                        printf("[IPv4] Not for me -> Routing Lookup\n");
+                        fflush(stdout);
+                        struct route *r = routing_lookup(ip->dst_ip);
+                        if (r == NULL) {
+                            printf("[IPv4] No route -> DROP\n");
+                            fflush(stdout);
                             break;
-                        default:
-                            break;
-                    }
+                        }
+                        if (r->gateway == 0) {
+                            printf("[IPv4] Route found: Direct delivery on local network\n");
+                        } else {
+                            char gw_str[INET_ADDRSTRLEN];
+                            inet_ntop(AF_INET, &r->gateway, gw_str, sizeof(gw_str));
+                            printf("[IPv4] Route found: Forward via Gateway %s\n", gw_str);
+                        }
+                        fflush(stdout);
+                        }
                 }
                 break;
+                
 
             default:
                 printf("Unknown EtherType: 0x%04x\n", ntohs(eth->ethertype));
