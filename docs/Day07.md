@@ -61,7 +61,7 @@ IPv4 Checksum
 
 ## 1.1 Checksum 怎麼計算？
 
-IPv4 使用 **16-bit One's Complement Sum**。它的概念可以想成：先把整個 IPv4 Header 切成一段一段 16-bit 數值，全部加總後把超過 16-bit 的 carry 加回低位，最後再取 One's Complement 得到 checksum。
+IPv4 使用 **16-bit One's Complement Sum**。它的概念可以想成：先把整個 IPv4 Header 切成一段一段 16-bit 數值，全部加總後把超過 16-bit 的 carry 加回低位，最後再取 One's Complement 得到 checksum。(注意，附圖為了方便理解 是使用8-bit一組，實際運算是16-bit一組做計算)
 
 ![Day07 IPv4 Header Checksum 運作原理](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day07/Day07_1.png)
 

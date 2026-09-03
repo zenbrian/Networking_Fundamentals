@@ -7,6 +7,8 @@
 #define ICMP_ECHO_REPLY   0
 #define ICMP_ECHO_REQUEST 8
 
+#define ICMP_TIME_EXCEEDED 11
+
 struct icmp_hdr {
     uint8_t type;
     uint8_t code;
@@ -18,5 +20,10 @@ struct icmp_hdr {
 void icmp_print_header(const struct icmp_hdr *icmp, size_t length);
 int icmp_verify_checksum(const void *icmp, size_t length);
 void icmp_handle(uint8_t *packet, size_t length);
+
+void icmp_receive(int fd, const uint8_t *frame, size_t len);
+
+// 新增：發送 ICMP Time Exceeded 回覆
+void icmp_send_time_exceeded(int fd, const uint8_t *orig_frame, size_t orig_len);
 
 #endif

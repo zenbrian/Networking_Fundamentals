@@ -27,5 +27,6 @@ struct ipv4_hdr {
 void ipv4_print_ip(uint32_t ip);
 void ipv4_print_header(const struct ipv4_hdr *ip);
 int ipv4_verify_checksum(const struct ipv4_hdr *ip);
+int ipv4_decrement_ttl(struct ipv4_hdr *ip);
 
 #endif

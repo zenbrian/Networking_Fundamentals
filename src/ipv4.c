@@ -41,3 +41,14 @@ void ipv4_print_header(const struct ipv4_hdr *ip)
     ipv4_print_ip(ip->dst_ip);
     printf("\n\n");
 }
+
+int ipv4_decrement_ttl(struct ipv4_hdr *ip)
+{
+    if (ip->ttl == 0)
+        return -1;
+    ip->ttl--;
+    if (ip->ttl == 0)
+        return -1;
+    return 0;
+}
+

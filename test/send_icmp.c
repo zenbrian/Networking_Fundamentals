@@ -54,7 +54,7 @@ int main()
     ip->total_length = htons(sizeof(struct ipv4_hdr) + sizeof(struct icmp_hdr));
     ip->identification = htons(1);
     ip->flags_fragment = 0;
-    ip->ttl = 64;
+    ip->ttl = 1;
     ip->protocol = IPPROTO_ICMP; // 1
     ip->src_ip = inet_addr("10.0.0.1");
     ip->dst_ip = inet_addr("10.0.0.2");
