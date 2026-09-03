@@ -29,6 +29,12 @@ EtherType = 0x0800
 
 並將封包交給 IPv4 模組進行解析。
 
+在進入程式碼之前，可以先用這張圖建立 Day06 的整體視角：Ethernet Layer 會先根據 EtherType 判斷 Payload 內容，當值為 `0x0800` 時，就代表接下來要解析的是 IPv4 Header。
+
+![Day06 IPv4 Header 解析](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day06/Day06_1.png)
+
+這張圖也標出了今天會優先解析的欄位：Version、IHL、TTL、Protocol，以及 Source / Destination IP。這些欄位會幫助我們確認封包是否真的是 IPv4、它還能經過幾個路由節點，以及下一層應該交給哪個協定處理。
+
 ---
 
 # 今日學習目標
