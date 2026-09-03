@@ -2,4 +2,5 @@ network
 send_arp
 send_arp_reply
 send_ipv4
+send_icmp
 *.o

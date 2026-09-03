@@ -1,8 +1,8 @@
 CC ?= gcc
 CFLAGS ?= -Wall -Wextra -Iinclude
 
-CORE_SRCS = src/ethernet.c src/arp.c src/arp_table.c src/ipv4.c src/checksum.c
-TARGETS = network send_arp send_arp_reply send_ipv4
+CORE_SRCS = src/ethernet.c src/arp.c src/arp_table.c src/ipv4.c src/icmp.c src/checksum.c
+TARGETS = network send_arp send_arp_reply send_ipv4 send_icmp
 
 .PHONY: all clean
 
@@ -18,6 +18,9 @@ send_arp_reply: test/send_arp_reply.c
 	$(CC) $(CFLAGS) $^ -o $@
 
 send_ipv4: test/send_ipv4.c src/checksum.c
+	$(CC) $(CFLAGS) $^ -o $@
+
+send_icmp: test/send_icmp.c src/checksum.c
 	$(CC) $(CFLAGS) $^ -o $@
 
 clean:

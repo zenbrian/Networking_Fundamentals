@@ -12,6 +12,7 @@
 #include "arp.h"
 #include "arp_table.h"
 #include "ipv4.h"
+#include "icmp.h"
 
 int tun_alloc(char *dev)
 {
@@ -105,6 +106,20 @@ int main()
                 if (payload_len >= sizeof(struct ipv4_hdr)) {
                     const struct ipv4_hdr *ip = (const struct ipv4_hdr *)payload;
                     ipv4_print_header(ip);
+
+                    // IPv4 Protocol Dispatcher
+                    switch (ip->protocol) {
+                        case IPPROTO_ICMP:
+                            if (payload_len >= sizeof(struct ipv4_hdr) + sizeof(struct icmp_hdr)) {
+                                const struct icmp_hdr *icmp =
+                                    (const struct icmp_hdr *)(payload + sizeof(struct ipv4_hdr));
+
+                                icmp_print_header(icmp, payload_len - sizeof(struct ipv4_hdr));
+                            }
+                            break;
+                        default:
+                            break;
+                    }
                 }
                 break;
 
