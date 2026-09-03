@@ -11,6 +11,7 @@
 #include "ethernet.h"
 #include "arp.h"
 #include "arp_table.h"
+#include "ipv4.h"
 
 int tun_alloc(char *dev)
 {
@@ -98,6 +99,13 @@ int main()
         switch (ntohs(eth->ethertype)) {
             case ETHERTYPE_ARP:
                 arp_receive(fd, payload, payload_len);
+                break;
+
+            case ETHERTYPE_IPV4:
+                if (payload_len >= sizeof(struct ipv4_hdr)) {
+                    const struct ipv4_hdr *ip = (const struct ipv4_hdr *)payload;
+                    ipv4_print_header(ip);
+                }
                 break;
 
             default:
