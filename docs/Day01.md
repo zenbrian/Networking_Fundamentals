@@ -24,7 +24,7 @@
 
 這條虛擬網路線，就是 **TAP Device**。
 
-![alt text](images/Day01_1.png)
+![alt text](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day01/Day01_1.png)
 
 ---
 
@@ -142,7 +142,7 @@ ip addr show tap0
 
 建立完成後，可以看到：
 
-![alt text](images/Day01_2.png)
+![alt text](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day01/Day01_2.png)
 
 此時 Linux 已經認為系統中存在一張名為 `tap0` 的網路卡。
 
@@ -251,7 +251,7 @@ sudo ./tap
 
 執行後：
 
-![alt text](images/Day01_3.png)
+![alt text](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day01/Day01_3.png)
 
 此時程式已經進入封包接收狀態。
 
@@ -265,8 +265,6 @@ sudo ./tap
 ping 10.0.0.2
 ```
 
-![alt text](images/Day01_4.png)
-
 此時 Linux 核心會嘗試尋找：
 
 ```text
@@ -276,6 +274,7 @@ ping 10.0.0.2
 因此送出 ARP Request。
 
 我們的程式便能接收到第一個 Ethernet Frame。
+![alt text](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day01/Day01_4.png)
 
 
 ---
