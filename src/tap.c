@@ -13,6 +13,7 @@
 #include "arp_table.h"
 #include "ipv4.h"
 #include "icmp.h"
+#include "checksum.h"
 
 int tun_alloc(char *dev)
 {
@@ -111,10 +112,48 @@ int main()
                     switch (ip->protocol) {
                         case IPPROTO_ICMP:
                             if (payload_len >= sizeof(struct ipv4_hdr) + sizeof(struct icmp_hdr)) {
-                                const struct icmp_hdr *icmp =
+                                const struct icmp_hdr *icmp_in =
                                     (const struct icmp_hdr *)(payload + sizeof(struct ipv4_hdr));
+                                size_t icmp_in_len = payload_len - sizeof(struct ipv4_hdr);
 
-                                icmp_print_header(icmp, payload_len - sizeof(struct ipv4_hdr));
+                                icmp_print_header(icmp_in, icmp_in_len);
+
+                                // 如果是 Echo Request，建立並送出 Reply
+                                if (icmp_in->type == ICMP_ECHO_REQUEST) {
+                                    uint8_t reply[2048];
+                                    memcpy(reply, buffer, n); // 複製收到的完整 Frame
+
+                                    struct ethernet_hdr *eth_out = (struct ethernet_hdr *)reply;
+                                    struct ipv4_hdr *ip_out = (struct ipv4_hdr *)(reply + ETH_HEADER_LEN);
+                                    uint8_t *icmp_out = reply + ETH_HEADER_LEN + sizeof(struct ipv4_hdr);
+                                    size_t icmp_len = n - (ETH_HEADER_LEN + sizeof(struct ipv4_hdr));
+
+                                    // 1. 交換 Ethernet MAC
+                                    uint8_t temp_mac[ETH_ADDR_LEN];
+                                    memcpy(temp_mac, eth_out->dst, ETH_ADDR_LEN);
+                                    memcpy(eth_out->dst, eth_out->src, ETH_ADDR_LEN);
+                                    memcpy(eth_out->src, temp_mac, ETH_ADDR_LEN);
+
+                                    // 2. 交換 IPv4 來源與目的 IP，並更新 TTL 與 Checksum
+                                    uint32_t temp_ip = ip_out->dst_ip;
+                                    ip_out->dst_ip = ip_out->src_ip;
+                                    ip_out->src_ip = temp_ip;
+                                    ip_out->ttl = 64;
+                                    ip_out->checksum = 0;
+                                    ip_out->checksum = ipv4_checksum(ip_out, sizeof(struct ipv4_hdr));
+
+                                    // 3. 修改 ICMP 為 Echo Reply 並重算 ICMP Checksum
+                                    icmp_handle(icmp_out, icmp_len);
+
+                                    // 4. 送出 Reply Frame 回 tap 介面 (TX)
+                                    ssize_t sent = write(fd, reply, n);
+                                    if (sent < 0) {
+                                        perror("[ICMP] write to tap failed");
+                                    } else {
+                                        printf("[ICMP] Echo Reply sent (%ld bytes)\n", sent);
+                                        fflush(stdout);
+                                    }
+                                }
                             }
                             break;
                         default:

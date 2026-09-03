@@ -24,3 +24,25 @@ void icmp_print_header(const struct icmp_hdr *icmp, size_t length)
     printf("Sequence   : %u\n", ntohs(icmp->sequence));
     printf("\n");
 }
+
+void icmp_handle(uint8_t *packet, size_t length)
+{
+    if (length < sizeof(struct icmp_hdr))
+        return;
+
+    struct icmp_hdr *icmp = (struct icmp_hdr *)packet;
+
+    // 只處理 Echo Request (Type = 8)
+    if (icmp->type != ICMP_ECHO_REQUEST) {
+        return;
+    }
+
+    printf("[ICMP] Echo Request received -> Generating Echo Reply\n");
+
+    // 1. 修改 Type 為 Echo Reply (0)，Code 保持 0
+    icmp->type = ICMP_ECHO_REPLY;
+
+    // 2. 重新計算 ICMP Checksum (包含 Header + 所有 Payload)
+    icmp->checksum = 0;
+    icmp->checksum = ipv4_checksum(packet, length);
+}

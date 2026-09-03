@@ -17,5 +17,6 @@ struct icmp_hdr {
 
 void icmp_print_header(const struct icmp_hdr *icmp, size_t length);
 int icmp_verify_checksum(const void *icmp, size_t length);
+void icmp_handle(uint8_t *packet, size_t length);
 
 #endif
