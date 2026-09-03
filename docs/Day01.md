@@ -2,6 +2,46 @@
 
 ---
 
+# 系列介紹：用 Google AI 從零打造 Network Stack
+
+這個系列是我報名 2026 iThome 鐵人賽 **Build on Google AI** 組別的 30 天實作挑戰。
+
+我的目標不是只讀懂網路概念，而是親手實作一條從瀏覽器一路通往封包底層的完整路徑：
+
+```text
+Web Browser
+    ↓
+HTTP
+    ↓
+TCP
+    ↓
+IPv4
+    ↓
+Ethernet
+    ↓
+TAP Device
+    ↓
+My Network Stack
+```
+
+在這個系列中，我會使用 **Google Gemini** 作為 AI 教授，請它協助規劃每天的課程內容、學習目標與實作方向；完成每日實作後，我會再回報成果，讓 Gemini 協助銜接下一階段的學習。
+
+同時，我也會使用 **Antigravity CLI** 作為程式碼助教，協助審查 C 語言實作、檢查封包處理邏輯，並把大量 debug 與 code review 細節留在助教上下文中，避免污染 Gemini 的主要教學脈絡。
+
+每天的文章都會盡量包含：
+
+1. 今天要理解的網路概念
+2. 今天要完成的程式實作
+3. Wireshark 或 tcpdump 驗證結果
+4. Gemini 教授安排的學習重點
+5. Antigravity CLI 助教協助審查後的修正與反思
+
+這個系列的最終目標，是透過 30 天的實作，逐步理解資料如何從應用層一路被封裝成封包，經過 TCP/IP、Ethernet 與 TAP Device，最後由自己寫的 Network Stack 進行處理。
+
+比起只記住各層協定名稱，我更希望透過實作建立一條完整的網路理解路徑：從 Bytes、封包格式、協定行為，到網路應用背後的資料流動。
+
+---
+
 # 今日學習目標
 
 完成以下內容：
