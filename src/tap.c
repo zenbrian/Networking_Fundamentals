@@ -6,15 +6,17 @@
 #include <sys/ioctl.h>
 #include <linux/if_tun.h>
 #include <net/if.h>
+#include <arpa/inet.h>
 
 #include "ethernet.h"
+#include "arp.h"
+#include "arp_table.h"
 
 int tun_alloc(char *dev)
 {
     struct ifreq ifr;
     int fd;
 
-    // 開啟 TUN/TAP 核心驅動
     fd = open("/dev/net/tun", O_RDWR);
     if (fd < 0) {
         perror("open /dev/net/tun");
@@ -22,22 +24,32 @@ int tun_alloc(char *dev)
     }
 
     memset(&ifr, 0, sizeof(ifr));
-
-    // TAP 模式 + 不附加額外資訊
     ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
 
     if (dev && *dev) {
         strncpy(ifr.ifr_name, dev, IFNAMSIZ);
     }
 
-    // 綁定 tap0
-    if (ioctl(fd, TUNSETIFF, (void *)&ifr) < 0) {
+    if (ioctl(fd, TUNSETIFF, &ifr) < 0) {
         perror("ioctl TUNSETIFF");
         close(fd);
         exit(1);
     }
 
     strcpy(dev, ifr.ifr_name);
+
+    // 自動將 TAP 網卡設置為 UP | RUNNING 狀態
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock >= 0) {
+        memset(&ifr, 0, sizeof(ifr));
+        strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+        if (ioctl(sock, SIOCGIFFLAGS, &ifr) >= 0) {
+            ifr.ifr_flags |= (IFF_UP | IFF_RUNNING);
+            ioctl(sock, SIOCSIFFLAGS, &ifr);
+        }
+        close(sock);
+    }
+
     return fd;
 }
 
@@ -47,12 +59,14 @@ int main()
     unsigned char buffer[2048];
 
     int fd = tun_alloc(dev);
+    arp_table_init();
 
-    printf("TAP device: %s\n", dev);
+    printf("TAP device: %s (UP)\n", dev);
+    printf("Ethernet header size: %lu bytes\n", sizeof(struct ethernet_hdr));
     printf("Waiting for Ethernet frame...\n");
+    fflush(stdout);
 
     while (1) {
-
         int n = read(fd, buffer, sizeof(buffer));
 
         if (n < 0) {
@@ -62,6 +76,7 @@ int main()
 
         if (n < ETH_HEADER_LEN) {
             printf("Invalid Ethernet frame\n");
+            fflush(stdout);
             continue;
         }
 
@@ -69,12 +84,29 @@ int main()
 
         if (!ethernet_accept_frame(eth)) {
             printf("[DROP] Not for me\n");
+            fflush(stdout);
             continue;
         }
 
         printf("[ACCEPT]\n");
         ethernet_print_header(eth);
+
+        // Ethernet EtherType 分流器 (Dispatcher)
+        const uint8_t *payload = buffer + ETH_HEADER_LEN;
+        size_t payload_len = n - ETH_HEADER_LEN;
+
+        switch (ntohs(eth->ethertype)) {
+            case ETHERTYPE_ARP:
+                arp_receive(fd, payload, payload_len);
+                break;
+
+            default:
+                printf("Unknown EtherType: 0x%04x\n", ntohs(eth->ethertype));
+                break;
+        }
+
         printf("Frame length: %d bytes\n\n", n);
+        fflush(stdout);
     }
 
     close(fd);
