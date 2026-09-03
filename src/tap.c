@@ -7,6 +7,8 @@
 #include <linux/if_tun.h>
 #include <net/if.h>
 
+#include "ethernet.h"
+
 int tun_alloc(char *dev)
 {
     struct ifreq ifr;
@@ -58,15 +60,15 @@ int main()
             break;
         }
 
-        printf("Received %d bytes\n", n);
-
-        printf("First bytes: ");
-
-        for (int i = 0; i < n && i < 32; i++) {
-            printf("%02x ", buffer[i]);
+        if (n < ETH_HEADER_LEN) {
+            printf("Invalid Ethernet frame\n");
+            continue;
         }
 
-        printf("\n");
+        struct ethernet_hdr *eth = (struct ethernet_hdr *)buffer;
+
+        ethernet_print_header(eth);
+        printf("Frame length: %d bytes\n\n", n);
     }
 
     close(fd);
