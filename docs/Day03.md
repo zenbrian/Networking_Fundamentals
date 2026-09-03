@@ -74,34 +74,11 @@ Receive Filter
 
 ## 1.1 網卡接收決策流程
 
-當 Ethernet Frame 抵達時：
+真實網卡在收到 Ethernet Frame 時，並不會無條件把所有封包都交給上層處理，而是會先根據目的 MAC 做一次接收判斷。
 
-```text
-               Ethernet Frame 抵達
-                        │
-                        ▼
-         ┌─────────────────────────────┐
-         │ 是廣播封包嗎？               │
-         │ ff:ff:ff:ff:ff:ff           │
-         └──────────────┬──────────────┘
-                        │
-            YES         │        NO
-             │          │
-             ▼          ▼
-         [ ACCEPT ]   是否送給我？
-                           │
-                           ▼
-              ┌─────────────────────┐
-              │ 目的 MAC == 我的 MAC │
-              └──────────┬──────────┘
-                         │
-              YES        │       NO
-               │         │
-               ▼         ▼
-          [ ACCEPT ]   [ DROP ]
-```
+![Day03 網卡接收決策流程](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day03/Day03_1.png)
 
-這就是大部分網卡最基本的接收邏輯。
+這張流程圖對應到本日程式中的核心邏輯：Broadcast 會被接受，目的 MAC 等於本機 MAC 的 Unicast 也會被接受，其餘封包則會被丟棄。
 
 ---
 
@@ -426,6 +403,12 @@ sudo ./ethernet_receiver
 ---
 
 # 8. 三大測試情境
+
+前面已經完成接收判斷邏輯，接下來用三種典型封包情境來驗證程式是否能正確接受或丟棄 Frame。
+
+![Day03 三大測試情境](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day03/Day03_2.png)
+
+這三個測試會分別覆蓋 Broadcast、目的 MAC 是自己的 Unicast，以及目的 MAC 不是自己的 Unicast，剛好對應到網卡接收決策的三種結果。
 
 ## 測試一：Broadcast
 

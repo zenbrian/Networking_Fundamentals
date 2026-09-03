@@ -31,18 +31,15 @@
 
 # 1. 核心概念：Ethernet Frame
 
+在開始解析封包之前，先用一張圖建立 Ethernet Frame 的整體輪廓。接下來的程式會依照這個結構，從前 14 bytes 取出 MAC 位址與 EtherType。
+
 當 Linux Kernel 將資料送到 TAP Device 時，送來的並不是 IP 封包，而是一個完整的 Ethernet Frame。
 
 結構如下：
 
-```text
-┌──────────────────────┬──────────────────────┬─────────────┐
-│ Destination MAC      │ Source MAC           │ EtherType   │
-│       6 Bytes        │       6 Bytes        │   2 Bytes   │
-└──────────────────────┴──────────────────────┴─────────────┘
-                             ↓
-                          Payload
-```
+![Day02 Ethernet Frame](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day02/Day02_1.png)
+
+從圖中可以看到，Ethernet Header 位在 Payload 前方，並由 Destination MAC、Source MAC 與 EtherType 三個欄位組成。
 
 Ethernet Header 固定長度為：
 
@@ -439,7 +436,14 @@ ping -I tap0 10.0.0.1
 # 8. 驗證解析結果
 
 程式輸出：
-![image](https://hackmd.io/_uploads/ryHtPF0wGl.png)
+```
+Ethernet Frame
+-------------------------
+Destination : ff:ff:ff:ff:ff:ff
+Source      : c6:bf:60:33:9d:73                  
+EtherType   : 0x0806                                        
+Frame length: 42 bytes                                                
+```
 
 ---
 
