@@ -24,7 +24,7 @@
 
 這條虛擬網路線，就是 **TAP Device**。
 
-<iframe src="https://drive.google.com/file/d/1pgSopyE5ratIHsyffoeqAA3yv2QPhC8k/preview" width="640" height="480"></iframe>
+![alt text](images/Day01_1.png)
 
 ---
 
@@ -142,7 +142,7 @@ ip addr show tap0
 
 建立完成後，可以看到：
 
-![image](https://hackmd.io/_uploads/ByGwrORwzg.png)
+![alt text](images/Day01_2.png)
 
 此時 Linux 已經認為系統中存在一張名為 `tap0` 的網路卡。
 
@@ -251,7 +251,7 @@ sudo ./tap
 
 執行後：
 
-![image](https://hackmd.io/_uploads/Hya_HdAPze.png)
+![alt text](images/Day01_3.png)
 
 此時程式已經進入封包接收狀態。
 
@@ -265,7 +265,7 @@ sudo ./tap
 ping 10.0.0.2
 ```
 
-<iframe src="https://drive.google.com/file/d/1lyxWhKCLBeRW_LzVtXUaN2K95n56sEtE/preview" width="640" height="480"></iframe>
+![alt text](images/Day01_4.png)
 
 此時 Linux 核心會嘗試尋找：
 
