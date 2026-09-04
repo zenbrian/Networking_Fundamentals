@@ -1,7 +1,9 @@
 CC ?= gcc
 CFLAGS ?= -Wall -Wextra -Iinclude
 
-CORE_SRCS = src/ethernet.c src/arp.c src/arp_table.c src/ipv4.c src/icmp.c src/checksum.c src/routing.c
+CORE_SRCS = src/ethernet.c src/arp.c src/arp_table.c src/ipv4.c src/icmp.c src/checksum.c src/routing.c src/udp.c
+
+
 TARGETS = network send_arp send_arp_reply send_ipv4 send_icmp test_routing
 
 .PHONY: all clean

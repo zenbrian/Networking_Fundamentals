@@ -6,29 +6,6 @@
 今天我們正式進入網路工程的重要主題 ── **Routing（路由）**。
 我們要讓 Network Stack 開始具備「判斷封包下一跳要去哪裡」的能力。
 
-```text
-                     IPv4 Packet (Inbound)
-                               │
-                               ▼
-                       Destination IP
-                               │
-                ┌──────────────┴──────────────┐
-                ▼                             ▼
-        是我的 IP (10.0.0.2)           不是我的 IP (例如 8.8.8.8)
-                │                             │
-                ▼                             ▼
-         Local Delivery                 Routing Table
-          (本地主機接收)                  (查路由表尋路)
-                │                             │
-         ICMP / TCP / UDP            ┌────────┴────────┐
-                                     ▼                 ▼
-                                  有路由             無路由
-                                     │                 │
-                                     ▼                 ▼
-                               Forward (轉發)     DROP (丟棄)
-                              (交給 Next Hop)
-```
-
 下面這張圖把今天的核心決策整理成一個完整流程：Network Stack 收到 IPv4 Packet 後，會先檢查 Destination IP 是否等於本機 IP；如果是，就交給本機的 ICMP / TCP / UDP 處理；如果不是，就進入 Routing Table 查詢，決定要轉發到下一跳或直接丟棄。
 
 ![Day11 IPv4 路由決策流程](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day11/Day11_1.png)
@@ -294,14 +271,6 @@ void routing_dump(void)
 ![Day11 tap0 實測情境](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day11/Day11_2.png)
 
 這張圖對應到接下來的驗收操作：`ping 10.0.0.2` 用來觀察本機接收與 ICMP 回覆，而 `ping 8.8.8.8` 搭配 Linux 路由設定，則用來觀察封包被導入 `tap0` 後，如何觸發我們實作的路由轉發決策。
-
-### 實戰排錯記錄：
-1. **第一次嘗試：`sudo ip route add 8.8.8.8 dev tap0`**
-   * 狀況：終端機持續出現 `EtherType: 0x0806 (ARP)`，Linux 不斷廣播尋找 8.8.8.8，封包無法往下一步送出。
-   * 原因：只指定 `dev tap0` 代表告訴 Linux「8.8.8.8 是直連鄰居」，所以 Linux 會發送 ARP 廣播詢問「誰是 8.8.8.8 的 MAC？」但實際上不會有設備回應這個 ARP Request。
-2. **第二次嘗試：`sudo ip route add 8.8.8.8 via 10.0.0.2 dev tap0` 報錯 `Error: Nexthop has invalid gateway`**
-   * 原因：Linux 主機端的 `tap0` 尚未設定 IP，因此 Linux 無法判斷自己是否能和同網段的 `10.0.0.2` 通訊。
-
 ---
 
 ### 正確驗收步驟：

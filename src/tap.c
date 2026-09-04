@@ -16,6 +16,8 @@
 #include "checksum.h"
 #include "routing.h"  // <-- 引入 routing 標頭檔
 #include "config.h"   // <-- 引入 LOCAL_IP 定義
+#include "udp.h"
+
 
 int tun_alloc(char *dev)
 {
@@ -73,6 +75,8 @@ int main()
     routing_add(inet_addr("10.0.0.0"), inet_addr("255.255.255.0"), 0); // 區網直連
     routing_add(inet_addr("0.0.0.0"), inet_addr("0.0.0.0"), inet_addr("10.0.0.1")); // 預設閘道
     routing_dump(); // 印出路由表
+    udp_init();
+    udp_bind(8080);
 
     printf("TAP device: %s (UP)\n", dev);
     printf("Ethernet header size: %lu bytes\n", sizeof(struct ethernet_hdr));
@@ -135,6 +139,9 @@ int main()
                         switch (ip->protocol) {
                             case IPPROTO_ICMP:
                                 icmp_receive(fd, buffer, n);
+                                break;
+                            case IPPROTO_UDP:
+                                udp_receive(fd, buffer, n);
                                 break;
                             default:
                                 break;
