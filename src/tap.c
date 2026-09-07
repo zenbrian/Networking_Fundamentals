@@ -18,6 +18,21 @@
 #include "config.h"   // <-- 引入 LOCAL_IP 定義
 #include "udp.h"
 
+static int global_tap_fd = -1;
+
+/* 第一個 UDP 應用程式：收到什麼就印出什麼，並觸發 udp_send 回應 9999 Port */
+void udp_echo_app(const uint8_t *data, size_t len)
+{
+    printf("\n=== UDP APP ===\n");
+    // 把資料印到螢幕上 (fwrite 可以安全輸出任何 byte，不怕中間有 \0)
+    fwrite(data, 1, len, stdout);
+    printf("===============\n\n");
+    fflush(stdout);
+
+    // 觸發發送！主動送一包 "Hello UDP" 到 10.0.0.1 的 9999 Port！
+    printf("[APP] Triggering udp_send to 10.0.0.1:9999...\n");
+    udp_send(global_tap_fd, 8080, inet_addr("10.0.0.1"), 9999, (const uint8_t *)"Hello UDP\n", 10);
+}
 
 int tun_alloc(char *dev)
 {
@@ -66,6 +81,7 @@ int main()
     unsigned char buffer[2048];
 
     int fd = tun_alloc(dev);
+    global_tap_fd = fd;
     
     // ARP table 初始化
     arp_table_init();
@@ -76,7 +92,7 @@ int main()
     routing_add(inet_addr("0.0.0.0"), inet_addr("0.0.0.0"), inet_addr("10.0.0.1")); // 預設閘道
     routing_dump(); // 印出路由表
     udp_init();
-    udp_bind(8080);
+    udp_bind(8080,udp_echo_app);
 
     printf("TAP device: %s (UP)\n", dev);
     printf("Ethernet header size: %lu bytes\n", sizeof(struct ethernet_hdr));
