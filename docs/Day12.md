@@ -42,6 +42,8 @@ Ethernet (L2) ──► IPv4 (L3) ──► Routing (Local Delivery vs Forwardin
 * `443`：HTTPS（加密網頁傳輸）
 * `67 / 68`：DHCP（動態主機設定）
 
+![Day12 IP 與 Port 分工：主機地址與應用房號](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day12/Day12_1.png)
+
 ---
 
 ### 2. TCP vs UDP 的設計哲學
@@ -73,6 +75,8 @@ IPv4 Header 中的 `Protocol` 欄位決定了上層的協定種類：
 2. **發送封包時（Send）**：
    - 客戶端送出資料時，作業系統會在 Socket Table 挑選一個尚未被使用的臨時埠號（Ephemeral Port，例如 `56994`）作為 `Source Port`，並登記入表。
    - **目的**：當遠端伺服器回覆封包時，回覆的目的地就是這個 `56994`，作業系統才能依照名冊將回信正確交回發送者手中。
+
+![Day12 UDP 接收與 Socket Table 分流流程](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day12/Day12_2.png)
 
 ---
 

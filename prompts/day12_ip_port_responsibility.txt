@@ -1,0 +1,29 @@
+Create a clean educational networking diagram for a tutorial article titled "UDP and Port".
+
+Diagram subject: IP address and Port responsibility — IP finds the host, Port finds the application.
+
+Canvas: 16:9 landscape, crisp vector-style technical diagram, white or very light background, readable labels, modern flat colors, no photorealism.
+
+Layout:
+- Left side: an incoming network packet arrow labeled "Incoming Packet".
+- The packet label should show: "Destination = 10.0.0.2:8080".
+- Arrow points to a large building illustration labeled "Host / Computer".
+- Above or beside the building, show "IP Address = 10.0.0.2" and a note "finds this host".
+- Inside the building, draw several rooms or app boxes:
+  - "Port 53 → DNS"
+  - "Port 80 → HTTP"
+  - "Port 443 → HTTPS"
+  - "Port 8080 → UDP Demo App"
+  - "Port 9999 → Test App"
+- Highlight "Port 8080 → UDP Demo App" with a bright accent color.
+- Add a small explanation callout:
+  "IP = building address"
+  "Port = room number / application endpoint"
+
+Style requirements:
+- Use green accents for IP / host.
+- Use orange accents for Port / applications.
+- Use blue accents for incoming packet.
+- Keep text large, concise, and readable.
+- Avoid tiny code, packet hex dumps, or excessive decorative elements.
+- Include the exact technical terms: IP Address, Port, Destination, 10.0.0.2, 8080, UDP Demo App, DNS, HTTP, HTTPS.
