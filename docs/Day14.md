@@ -21,7 +21,7 @@ Hello UDP
 # 今日學習目標與成果
 
 - [x] **掌握由上至下的封包封裝（Encapsulation）**：依序組裝應用層資料、UDP Header、IPv4 Header、計算 IP Checksum、查詢 ARP 並封裝 Ethernet Header。
-- [x] **動態來源埠號（Dynamic Source Port）設計**：避免將 Port 寫死，使 `udp_send` 既能作為伺服器回覆（8080），也能作為客戶端主動發起通訊（臨時埠號 / Ephemeral Port）。
+- [x] **可指定來源埠號（Configurable Source Port）設計**：`udp_send()` 不在函式內部寫死來源 Port，而是由呼叫端傳入 `src_port`；本日範例使用 8080 作為伺服器回覆來源埠，未來也可傳入臨時埠號（Ephemeral Port）實作客戶端主動通訊。
 - [x] **跨層協同運作（Cross-layer Coordination）**：在 L2 透過 `arp_table_lookup` 取得目標主機的實體 MAC 位址，體會「沒有 MAC 封包就出不去」的網路鐵律。
 - [x] **釐清關鍵盲點（Subnet Mask 的本質）**：深刻理解 IPv4 標頭中本來就沒有子網路遮罩欄位，本機接收與路由轉發的判定機制。
 - [x] **三終端機聯動實測與位元組級驗算（52 Bytes Exact Match）**：
@@ -82,7 +82,9 @@ write(tap_fd, buffer, 52) ──► 送入 TAP 虛擬網卡！
 
 下圖為本次實測中，Terminal 2（Network Stack）從接收廣播、學習 MAC、本機交付，到反手呼叫 `udp_send` 發送的完整日誌與逐層解析：
 
-![Day 14 UDP 收發完整生命週期與底層解析](images/Day14/terminal2_annotated.png)
+![Day 14 UDP 收發完整生命週期與底層解析](images/Day14/terminal2.png)
+
+> 實作前提：`udp_send()` 依賴 ARP Table 查詢目的 MAC，因此本日三終端機實測會先由 Linux 主機送一個 UDP 封包進來，讓我們的 Network Stack 透過先前的 ARP Request / Reply 流程學到 `10.0.0.1` 的 MAC。若 ARP Table 裡尚未有目的 IP 對應的 MAC，`udp_send()` 會印出 `Destination MAC not in ARP table` 並放棄送出。
 
 ---
 
@@ -91,7 +93,7 @@ write(tap_fd, buffer, 52) ──► 送入 TAP 虛擬網卡！
 ### 1. `include/udp.h`：宣告發送介面
 
 ```c
-/* 支援動態來源 Port 的發送介面 */
+/* 支援由呼叫端指定來源 Port 的發送介面 */
 int udp_send(int fd, uint16_t src_port, uint32_t dst_ip, uint16_t dst_port, const uint8_t *data, size_t len);
 ```
 
@@ -134,7 +136,7 @@ int udp_send(int fd, uint16_t src_port, uint32_t dst_ip, uint16_t dst_port, cons
     memcpy(payload, data, len);
 
     // 4. 封裝 UDP Header (L4)
-    udp->src_port = htons(src_port);                   // 動態來源 Port (可為 8080 或臨時 Port)
+    udp->src_port = htons(src_port);                   // 由呼叫端指定來源 Port (可為 8080 或臨時 Port)
     udp->dst_port = htons(dst_port);                   // 目標 Port
     udp->length = htons(sizeof(struct udp_hdr) + len); // UDP 標頭長度(8) + 資料長度
     udp->checksum = 0;                                 // IPv4 下 UDP Checksum 設為 0 代表不校驗
@@ -286,6 +288,8 @@ trigger
 [UDP] Successfully sent 52 bytes from port 8080 to port 9999
 Frame length: 50 bytes
 ```
+
+> 注意：這裡有兩個不同封包。`Frame length: 50 bytes` 是剛剛收到的 trigger UDP 封包長度；`Successfully sent 52 bytes` 則是 `udp_echo_app()` callback 中另外主動送出的 `"Hello UDP\n"` 封包長度，因此兩個數字不同是正常的。
 
 ---
 

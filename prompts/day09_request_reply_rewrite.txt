@@ -1,0 +1,53 @@
+Create a clean educational networking diagram for a tutorial article titled "Day 09 Request to Reply Field Rewrite".
+
+Diagram subject: How an ICMP Echo Request is transformed into an ICMP Echo Reply by rewriting fields across Ethernet, IPv4, and ICMP.
+
+Canvas: 16:9 landscape, crisp vector-style technical diagram, white or very light background, readable labels, modern flat colors, no photorealism.
+
+Layout:
+- Two large vertical panels side by side.
+- Left panel title: "Received Echo Request".
+- Right panel title: "Generated Echo Reply".
+- Between panels, a big arrow labeled "rewrite + recalculate checksums".
+
+Inside each panel, draw three stacked protocol boxes:
+1. Ethernet Header box (blue)
+2. IPv4 Header box (green)
+3. ICMP Header + Payload box (orange)
+
+Left panel content:
+Ethernet:
+- SRC = Host MAC
+- DST = LOCAL_MAC
+IPv4:
+- SRC = 10.0.0.1
+- DST = 10.0.0.2
+- Checksum = old
+ICMP:
+- Type = 8 Echo Request
+- Code = 0
+- ID / Seq = keep
+- Payload = keep
+- Checksum = old
+
+Right panel content:
+Ethernet:
+- SRC = LOCAL_MAC
+- DST = Host MAC
+IPv4:
+- SRC = 10.0.0.2
+- DST = 10.0.0.1
+- Checksum = recalculated
+ICMP:
+- Type = 0 Echo Reply
+- Code = 0
+- ID / Seq = unchanged
+- Payload = unchanged
+- Checksum = recalculated
+
+Style requirements:
+- Use consistent colors: blue for Ethernet, green for IPv4, orange for ICMP.
+- Highlight changed fields with a small "changed" badge or bold accent.
+- Highlight unchanged fields with a small "kept" badge.
+- Make text large, concise, and readable.
+- Avoid tiny code, packet hex dumps, or overly detailed decorations.

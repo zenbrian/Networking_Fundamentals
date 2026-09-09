@@ -5,6 +5,8 @@
 今天我們要邁向路由器（Router）的核心思維：**生命週期限制（Time-to-Live, TTL）** 與 **ICMP Time Exceeded (Type = 11)**！
 同時，我們將深入剖析網路工程師每日必用的 `traceroute` 診斷工具背後的真正原理。
 
+> 角色轉換提醒：Day 8～Day 9 我們把 Network Stack 當成「終端主機（Endpoint）」使用，主要處理目的地就是自己的封包；從 Day 10 開始，我們開始讓它學習「路由器（Router）」行為。真正的 Router 只會在**轉發（Forwarding）**封包時扣減 TTL；若封包目的地就是本機，應走 **Local Delivery**，不需要扣 TTL。Day 10 先用簡化模型觀察 TTL Expired，Day 11 會再加入目的地判斷，讓 Local Delivery 與 Forwarding 決策更清楚。
+
 ```text
 IPv4 Packet (Inbound)
           │
@@ -23,6 +25,8 @@ IPv4 Packet (Inbound)
       ICMP Time Exceeded (Type = 11, Code = 0)
       附帶「原 IP 標頭 + 前 8 Bytes 原資料」回覆來源端
 ```
+
+![Day10 TTL 遞減與 ICMP Time Exceeded 流程](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day10/Day10_1.png)
 
 ---
 
@@ -61,7 +65,9 @@ IPv4 Packet (Inbound)
 
 ### 2. 真正的 Router 行為：不只丟棄，還要報錯
 
-當 Router 收到 `TTL == 1` 的封包時：
+TTL 扣減是 **Forwarding Path** 的責任，而不是 Local Delivery 的責任。也就是說，當 Router 收到「不是給自己、需要幫忙轉送」的封包時，才會先做 `TTL--`。
+
+當 Router 在轉發路徑收到 `TTL == 1` 的封包時：
 1. `TTL--` 變為 `0`。
 2. Router 丟棄該封包。
 3. Router 主動組裝一個 **ICMP Time Exceeded (Type = 11, Code = 0)** 封包發回給來源端（告訴來源端：「你的封包死在我這裡了」）。
@@ -117,6 +123,8 @@ IPv4 Packet (Inbound)
 直到抵達最終目的地，目的端回覆 ICMP Echo Reply (或 Port Unreachable)，探測結束！
 ```
 
+![Day10 traceroute TTL 探測原理](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day10/Day10_2.png)
+
 ---
 
 # 今日程式碼改動詳解
@@ -143,6 +151,8 @@ int ipv4_decrement_ttl(struct ipv4_hdr *ip)
     return 0;
 }
 ```
+
+> 注意：這個函式目前只負責 TTL 數值扣減與過期判斷。若封包接下來真的要被轉發出去，因為 IPv4 Header 已被修改，送出前必須將 `ip->checksum = 0` 並重新計算 IPv4 Header Checksum。Day 10 的重點是觀察 TTL Expired 與 ICMP Time Exceeded；完整 forwarding datapath 會在後續再逐步補齊。
 
 ---
 
@@ -315,7 +325,8 @@ void icmp_receive(int fd, const uint8_t *frame, size_t len)
                     struct ipv4_hdr *ip = (struct ipv4_hdr *)payload;
                     ipv4_print_header(ip);
 
-                    // 1. 扣減 TTL，若歸零則丟棄封包並回傳 ICMP Time Exceeded
+                    // Day 10 簡化模型：先模擬 Router forwarding path 的 TTL 扣減
+                    // 真實 stack 會先判斷 Local Delivery；只有需要轉發的封包才扣 TTL
                     if (ipv4_decrement_ttl(ip) != 0) {
                         printf("[IPv4] TTL Expired\n");
                         icmp_send_time_exceeded(fd, buffer, n);

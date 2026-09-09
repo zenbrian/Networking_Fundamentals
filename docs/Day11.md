@@ -6,11 +6,13 @@
 今天我們正式進入網路工程的重要主題 ── **Routing（路由）**。
 我們要讓 Network Stack 開始具備「判斷封包下一跳要去哪裡」的能力。
 
-下面這張圖把今天的核心決策整理成一個完整流程：Network Stack 收到 IPv4 Packet 後，會先檢查 Destination IP 是否等於本機 IP；如果是，就交給本機的 ICMP / TCP / UDP 處理；如果不是，就進入 Routing Table 查詢，決定要轉發到下一跳或直接丟棄。
+下面這張圖把今天的核心決策整理成一個完整流程：Network Stack 收到 IPv4 Packet 後，會先檢查 Destination IP 是否等於本機 IP；如果是，就交給本機的 ICMP / TCP / UDP 處理（Local Delivery，不扣 TTL）；如果不是，才進入 Router 的 Forwarding Path：扣減 TTL、檢查是否過期，再查詢 Routing Table，決定下一跳或直接丟棄。
 
 ![Day11 IPv4 路由決策流程](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day11/Day11_1.png)
 
 這也是 Day11 和前幾天最大的不同：前面我們多半只處理「給自己的封包」，但加入 Routing 之後，Network Stack 開始能判斷封包是否需要被轉送，逐步接近真正路由器的行為。
+
+> 本日範圍說明：Day 11 的重點是 **Routing Lookup / Forwarding Decision（轉發決策）**，也就是「判斷下一跳應該是誰」。目前還沒有真正把封包重新封裝成新的 Ethernet Frame 並 `write()` 送出，因此本文中的「轉發」若未特別註明，指的是「轉發決策」，不是完整 forwarding datapath。
 
 ---
 
@@ -23,7 +25,7 @@
 - [x] **釐清 Routing Table 與 ARP Table 的差異**：理解「L3 決定下一跳 IP」與「L2 決定下一跳 MAC」的職責分工。
 - [x] **整合進主程式 `src/tap.c`**：在 IPv4 接收端自動分支：
   - 目的地為本機 ──► 走 Local Delivery，回覆 ICMP Echo Reply。
-  - 目的地非本機 ──► 查詢路由表，決定是區網直連還是經由 Default Gateway 轉發。
+  - 目的地非本機 ──► 進入 Forwarding Path，扣減 TTL 後查詢路由表，決定是區網直連還是經由 Default Gateway 作為下一跳。
 - [x] **實測 Linux 系統路由導流**：在 Linux 主機端動態指派 IP、設定 Next Hop 路由，讓 `ping 8.8.8.8` 的封包進入虛擬網卡並觸發轉發決策。
 
 ---
@@ -214,15 +216,8 @@ void routing_dump(void)
 ### 3. `src/tap.c`：主分流器整合 Local Delivery 與 Routing
 
 ```c
-                    // 1. 扣減 TTL，若歸零則丟棄並送出 Time Exceeded
-                    if (ipv4_decrement_ttl(ip) != 0) {
-                        printf("[IPv4] TTL Expired\n");
-                        icmp_send_time_exceeded(fd, buffer, n);
-                        fflush(stdout);
-                        break;
-                    }
-
-                    // 2. 判斷目的 IP 是不是本機 (10.0.0.2)
+                    // 1. 先判斷目的 IP 是不是本機 (10.0.0.2)
+                    // Local Delivery 不屬於 Router forwarding path，因此不扣 TTL
                     uint32_t my_ip = *(uint32_t *)LOCAL_IP;
 
                     if (ip->dst_ip == my_ip) {
@@ -238,10 +233,19 @@ void routing_dump(void)
                                 break;
                         }
                     } else {
-                        // 目的 IP 不是我：進入 Routing 路由查詢
-                        printf("[IPv4] Not for me -> Routing Lookup\n");
+                        // 目的 IP 不是我：進入 Router forwarding path
+                        printf("[IPv4] Not for me -> Forwarding Path\n");
                         fflush(stdout);
 
+                        // 2. 只有需要轉發的封包才扣 TTL；若歸零則丟棄並送出 Time Exceeded
+                        if (ipv4_decrement_ttl(ip) != 0) {
+                            printf("[IPv4] TTL Expired\n");
+                            icmp_send_time_exceeded(fd, buffer, n);
+                            fflush(stdout);
+                            break;
+                        }
+
+                        // 3. 查詢 Routing Table，做 forwarding decision
                         struct route *r = routing_lookup(ip->dst_ip);
                         if (r == NULL) {
                             printf("[IPv4] No route -> DROP\n");
@@ -254,7 +258,7 @@ void routing_dump(void)
                         } else {
                             char gw_str[INET_ADDRSTRLEN];
                             inet_ntop(AF_INET, &r->gateway, gw_str, sizeof(gw_str));
-                            printf("[IPv4] Route found: Forward via Gateway %s\n", gw_str);
+                            printf("[IPv4] Route found: Next hop Gateway %s\n", gw_str);
                         }
                         fflush(stdout);
                     }
@@ -346,7 +350,7 @@ Destination IP : 10.0.0.2
 
 ---
 
-### 實測情境 2：外網路由查詢與轉發（Not for me -> Routing Lookup）
+### 實測情境 2：外網路由查詢與轉發決策（Not for me -> Forwarding Path）
 
 發送給外部 IP `8.8.8.8`（經由前面設定的 `via 10.0.0.2` 導流）：
 ```bash
@@ -372,11 +376,13 @@ Checksum     : 0x... (OK)
 Source IP    : 10.0.0.1
 Destination IP : 8.8.8.8
 
-[IPv4] Not for me -> Routing Lookup
-[IPv4] Route found: Forward via Gateway 10.0.0.1
+[IPv4] Not for me -> Forwarding Path
+[IPv4] Route found: Next hop Gateway 10.0.0.1
 ```
 
-**驗證成功：** 目的 IP 為 `8.8.8.8`（不等於 `LOCAL_IP`），因此觸發路由表查詢（Routing Lookup）。透過預設路由 `0.0.0.0/0`，Network Stack 能判斷此封包應交由 Gateway `10.0.0.1` 進行下一跳轉發。
+**驗證成功：** 目的 IP 為 `8.8.8.8`（不等於 `LOCAL_IP`），因此進入 Forwarding Path 並觸發路由表查詢（Routing Lookup）。透過預設路由 `0.0.0.0/0`，Network Stack 能判斷此封包的下一跳應交由 Gateway `10.0.0.1`。
+
+> 注意：Day 11 到這裡完成的是「下一跳決策」。真正要把封包送出去，還需要查 ARP 取得下一跳 MAC、改寫 Ethernet Header、更新因 TTL 改變而受影響的 IPv4 Checksum，最後再 `write()` 回 TAP；這會在後續傳送路徑逐步補齊。
 
 ---
 

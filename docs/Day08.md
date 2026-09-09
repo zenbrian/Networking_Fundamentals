@@ -64,6 +64,7 @@ ICMP 標頭大小為 **8 Bytes**：
 #define ICMP_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 #define ICMP_ECHO_REPLY   0
 #define ICMP_ECHO_REQUEST 8

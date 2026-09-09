@@ -19,6 +19,8 @@ Host (10.0.0.1)
 Host 收到 64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=...
 ```
 
+![Day09 ICMP Echo Request / Echo Reply 往返流程](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day09/Day09_1.png)
+
 ---
 
 # 今日學習目標與成果
@@ -63,6 +65,8 @@ Ping 的回應流程涉及跨層級的「位址與型態對調」：
                           ▼
                    TX Frame (Reply)
 ```
+
+![Day09 Echo Request 轉 Echo Reply 欄位反轉圖](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day09/Day09_2.png)
 
 ### 2. 為什麼 Checksum 必須包含 Payload？
 * Linux 標準 `ping` 預設會附帶 **56 bytes 的隨機 Payload**。

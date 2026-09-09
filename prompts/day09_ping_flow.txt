@@ -1,0 +1,23 @@
+Create a clean educational networking diagram for a tutorial article titled "Day 09 ICMP Echo Reply".
+
+Diagram subject: ICMP Echo Request / Echo Reply round-trip flow between a Linux Host and a custom Network Stack over a TAP device.
+
+Canvas: 16:9 landscape, crisp vector-style technical diagram, white or very light background, readable labels, modern flat colors, no photorealism.
+
+Layout:
+- Left side: "Linux Host" with labels "IP 10.0.0.1" and "MAC: Host MAC".
+- Right side: "Custom Network Stack" with labels "IP 10.0.0.2" and "MAC: LOCAL_MAC".
+- A subtle horizontal connector representing "tap0 / TAP virtual link" between them.
+- Four numbered arrows in chronological order:
+  1. From Linux Host to Custom Network Stack: "ARP Request: Who has 10.0.0.2?"
+  2. From Custom Network Stack to Linux Host: "ARP Reply: 10.0.0.2 is at LOCAL_MAC"
+  3. From Linux Host to Custom Network Stack: "ICMP Echo Request (Type 8)"
+  4. From Custom Network Stack to Linux Host: "ICMP Echo Reply (Type 0)"
+- At the bottom, add a small result label: "ping receives: 64 bytes from 10.0.0.2"
+
+Style requirements:
+- Use blue accents for Ethernet/ARP, orange accents for ICMP, green accents for IP addresses.
+- Keep text short and large enough to read.
+- Use simple icons only: computer icon for Linux Host, server/stack icon for Custom Network Stack.
+- Include the exact technical terms: ARP Request, ARP Reply, ICMP Echo Request, ICMP Echo Reply, Type 8, Type 0, 10.0.0.1, 10.0.0.2, LOCAL_MAC.
+- Avoid tiny packet hex dumps. Avoid decorative clutter.

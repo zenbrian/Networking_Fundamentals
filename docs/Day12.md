@@ -69,7 +69,7 @@ IPv4 Header 中的 `Protocol` 欄位決定了上層的協定種類：
    - 核心讀取封包的 `Destination Port`。
    - 查詢 Socket Table：
      - 若有程式 `bind(8080)` ➔ 將資料遞交給應用程式緩衝區（**Deliver**）。
-     - 若無人登記 ➔ 封包丟棄（**Drop / No listener**）並回覆 ICMP Port Unreachable。
+     - 若無人登記 ➔ 封包丟棄（**Drop / No listener**）。真實作業系統通常會回覆 ICMP Port Unreachable；本日先聚焦在 UDP Port Lookup，暫時只印出 `No listener`，尚未實作 ICMP Port Unreachable。
 2. **發送封包時（Send）**：
    - 客戶端送出資料時，作業系統會在 Socket Table 挑選一個尚未被使用的臨時埠號（Ephemeral Port，例如 `56994`）作為 `Source Port`，並登記入表。
    - **目的**：當遠端伺服器回覆封包時，回覆的目的地就是這個 `56994`，作業系統才能依照名冊將回信正確交回發送者手中。

@@ -1,0 +1,22 @@
+Create a clean educational networking diagram for a tutorial article titled "Day 10 traceroute TTL probing principle".
+
+Diagram subject: How traceroute discovers routers by sending probes with increasing TTL values.
+
+Canvas: 16:9 landscape, crisp vector-style technical diagram, white or very light background, readable labels, modern flat colors, no photorealism.
+
+Layout:
+- Left side: Source Host labeled "Source Host 10.0.0.1".
+- Across the middle from left to right: Router 1, Router 2, Router 3, Destination labeled "Destination 8.8.8.8".
+- Show three or four horizontal probe rows:
+  Row 1: "Probe TTL=1" from Source to Router 1, then label at Router 1: "TTL becomes 0" and return arrow "ICMP Time Exceeded from Router 1".
+  Row 2: "Probe TTL=2" passes Router 1, reaches Router 2, label "TTL becomes 0", return arrow "ICMP Time Exceeded from Router 2".
+  Row 3: "Probe TTL=3" passes Router 1 and Router 2, reaches Router 3, label "TTL becomes 0", return arrow "ICMP Time Exceeded from Router 3".
+  Final row: "Probe TTL=N" reaches Destination, return arrow "Echo Reply or Port Unreachable".
+- Add a small caption at bottom: "traceroute maps the path by increasing TTL one hop at a time".
+
+Style requirements:
+- Use blue for outgoing probes, orange for ICMP Time Exceeded replies, green for final destination reply.
+- Make all text large and readable.
+- Use simple router icons and arrows.
+- Avoid clutter, tiny text, code, or packet hex dumps.
+- Include exact terms: traceroute, TTL=1, TTL=2, TTL=3, TTL=N, ICMP Time Exceeded, Echo Reply, Port Unreachable.

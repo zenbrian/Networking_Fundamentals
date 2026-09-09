@@ -1,0 +1,26 @@
+Create a clean educational networking diagram for a tutorial article titled "Day 10 TTL and ICMP Time Exceeded".
+
+Diagram subject: TTL decrement and ICMP Time Exceeded decision flow in a router forwarding path.
+
+Canvas: 16:9 landscape, crisp vector-style technical diagram, white or very light background, readable labels, modern flat colors, no photorealism.
+
+Layout:
+- Top center: "Incoming IPv4 Packet" with a packet icon and label "TTL = 1 or TTL > 1".
+- Arrow down to a router icon labeled "Router Forwarding Path".
+- Arrow down to a process box labeled "TTL = TTL - 1".
+- Arrow down to a decision diamond labeled "TTL == 0?".
+- Left branch: "No" leading to a green box labeled "Forward Packet" with note "TTL > 0".
+- Right branch: "Yes" leading to a red/orange box labeled "Drop Original Packet".
+- From the drop box, arrow to another orange box labeled "Send ICMP Time Exceeded" with labels "Type = 11" and "Code = 0".
+- Bottom note: "TTL is a hop counter, not a timer".
+
+Important conceptual detail:
+- Include a small note near the router: "TTL decrement happens on forwarding path".
+- Do not imply local delivery decrements TTL.
+
+Style requirements:
+- Use green for normal forwarding, orange/red for TTL expired and ICMP error.
+- Use blue/gray for IPv4 packet and router elements.
+- Keep text concise, large, and readable.
+- Avoid hex dumps and overly detailed packet internals.
+- Include exact terms: TTL, Forwarding Path, Drop Original Packet, ICMP Time Exceeded, Type 11, Code 0.
