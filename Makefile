@@ -4,7 +4,7 @@ CFLAGS ?= -Wall -Wextra -Iinclude
 CORE_SRCS = src/ethernet.c src/arp.c src/arp_table.c src/ipv4.c src/icmp.c src/checksum.c src/routing.c src/udp.c
 
 
-TARGETS = network send_arp send_arp_reply send_ipv4 send_icmp test_routing
+TARGETS = network send_arp send_arp_reply send_ipv4 send_icmp test_routing dns_client
 
 .PHONY: all clean
 
@@ -23,6 +23,9 @@ send_ipv4: test/send_ipv4.c src/checksum.c
 	$(CC) $(CFLAGS) $^ -o $@
 
 send_icmp: test/send_icmp.c src/checksum.c
+	$(CC) $(CFLAGS) $^ -o $@
+
+dns_client: src/dns_client.c src/dns.c
 	$(CC) $(CFLAGS) $^ -o $@
 
 clean:
