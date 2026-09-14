@@ -1,9 +1,15 @@
 #include <stdio.h>
 #include <arpa/inet.h>
+#include <string.h>
+#include <unistd.h>
+
 #include "ethernet.h"
 #include "ipv4.h"
-
 #include "tcp.h"
+#include "config.h" // 取得 LOCAL_MAC 和 LOCAL_IP
+#include "checksum.h"
+#include "arp.h"    // 取得 arp_get_mac
+#include "arp_table.h"
 
 #define MAX_TCP_SOCKETS 64
 
@@ -122,8 +128,6 @@ void tcp_print_header(const struct tcp_hdr *tcp)
 
 void tcp_receive(int fd, const uint8_t *buffer, size_t len)
 {
-    (void)fd; // 目前還不需要回覆，避免 unused 警告
-
     // 取得 IPv4 標頭以計算實際 IP Header 長度
     struct ipv4_hdr *ip = (struct ipv4_hdr *)(buffer + ETH_HEADER_LEN);
     size_t ip_hdr_len = (ip->version_ihl & 0x0F) * 4;
@@ -133,6 +137,10 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
         printf("[TCP] Packet too short\n");
         return;
     }
+    
+    // 趁著剛收到封包，把對方的 IP 與 MAC 記錄到通訊錄！
+    struct ethernet_hdr *rx_eth = (struct ethernet_hdr *)buffer;
+    arp_table_insert((const uint8_t *)&ip->src_ip, rx_eth->src);
 
     struct tcp_hdr *tcp = (struct tcp_hdr *)(buffer + ETH_HEADER_LEN + ip_hdr_len);
     tcp_print_header(tcp);
@@ -152,8 +160,66 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
             printf("[TCP] Connection table full!\n");
             return;
         }
+        uint32_t client_seq = ntohl(tcp->seq); // 取出對方的 SEQ (轉成 host byte order)
+        conn->ack = client_seq + 1;            // 我們期待對方的下一號 (1001)
+        conn->seq = 5000;                      // Server 自己的初始序號 ISN (先固定 5000)
+
         tcp_dump_table();
+
+        tcp_send_syn_ack(fd, conn);
+
 
         return;
     }
 }
+
+    
+int tcp_send_syn_ack(int fd, struct tcp_socket *conn){
+    //1.準備Buffer與切割各層指標
+    uint8_t buffer[ETH_HEADER_LEN + sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr)];
+    memset(buffer, 0, sizeof(buffer));
+    struct ethernet_hdr *eth = (struct ethernet_hdr *)buffer;
+    struct ipv4_hdr *ip = (struct ipv4_hdr *)(buffer + ETH_HEADER_LEN);
+    struct tcp_hdr *tcp = (struct tcp_hdr *)(buffer + ETH_HEADER_LEN + sizeof(struct ipv4_hdr));
+    //2. 封裝 TCP Header
+    tcp->src_port = htons(conn->dst_port);
+    tcp->dst_port = htons(conn->src_port);
+    tcp->seq = htonl(conn->seq); // 5000
+    tcp->ack = htonl(conn->ack); // 1001
+    tcp->data_offset = (5 << 4); // 只有 Header
+    tcp->window = htons(4096); // 客戶端通常會給很大
+    tcp->flags = (TCP_ACK | TCP_SYN);
+    tcp->checksum = 0;
+    tcp->urgent_ptr = 0;
+    //3. 封裝 Layer 3: IPv4 Header
+    ip->version_ihl = (4 << 4) | 5;
+    ip->tos = 0;
+    ip->total_length = htons(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr)); // Header + TCP Header (假設沒有 Data)
+    ip->identification = htons(2001);
+    ip->flags_fragment = 0;
+    ip->ttl = 64;
+    ip->protocol = IPPROTO_TCP; // 6: TCP
+    ip->src_ip = conn->dst_ip;
+    ip->dst_ip = conn->src_ip;
+    ip->checksum = 0;
+    ip->checksum = ipv4_checksum(ip, sizeof(struct ipv4_hdr));
+    //4. 封裝 Layer 2: Ethernet Header
+    struct arp_entry *entry = arp_table_lookup((const uint8_t *)&conn->src_ip);
+    if (!entry || !entry->valid) {
+        printf("[TCP] Send SYN-ACK failed: MAC not in ARP table\n");
+        return -1;
+    }
+    memcpy(eth->dst, entry->mac, ETH_ADDR_LEN);
+    memcpy(eth->src, LOCAL_MAC, ETH_ADDR_LEN);
+    eth->ethertype = htons(ETHERTYPE_IPV4);
+    //5. 寫出到虛擬網卡
+    ssize_t sent = write(fd, buffer, sizeof(buffer));
+    if (sent < 0) {
+        perror("[TCP] write SYN-ACK failed");
+        return -1;
+    }
+    printf("[TCP] Sent SYN-ACK: SEQ=%u, ACK=%u\n", conn->seq, conn->ack);
+    return 0;
+
+}
+

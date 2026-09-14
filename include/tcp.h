@@ -50,6 +50,8 @@ struct tcp_socket
     uint32_t dst_ip;
     uint16_t src_port;
     uint16_t dst_port;
+    uint32_t seq;
+    uint32_t ack;
     enum tcp_state state;
 };
 
@@ -61,5 +63,7 @@ void tcp_init(void);
 int tcp_listen(uint16_t port);
 struct tcp_socket* tcp_find_listener(uint16_t port);
 void tcp_dump_table(void);
+
+int tcp_send_syn_ack(int fd, struct tcp_socket *conn);
 
 #endif /* TCP_H */
