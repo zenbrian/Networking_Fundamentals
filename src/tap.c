@@ -17,6 +17,7 @@
 #include "routing.h"  // <-- 引入 routing 標頭檔
 #include "config.h"   // <-- 引入 LOCAL_IP 定義
 #include "udp.h"
+#include "tcp.h"
 
 static int global_tap_fd = -1;
 
@@ -93,6 +94,8 @@ int main()
     routing_dump(); // 印出路由表
     udp_init();
     udp_bind(8080,udp_echo_app);
+    tcp_init();
+    tcp_listen(8080);
 
     printf("TAP device: %s (UP)\n", dev);
     printf("Ethernet header size: %lu bytes\n", sizeof(struct ethernet_hdr));
@@ -158,6 +161,9 @@ int main()
                                 break;
                             case IPPROTO_UDP:
                                 udp_receive(fd, buffer, n);
+                                break;
+                            case IPPROTO_TCP:
+                                tcp_receive(fd, buffer, n);
                                 break;
                             default:
                                 break;
