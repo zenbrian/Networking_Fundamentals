@@ -6,6 +6,7 @@ send_icmp
 test_routing
 dns_client
 send_tcp_syn
+send_tcp_handshake
 *.o
 
 # Local secrets

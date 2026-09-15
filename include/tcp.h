@@ -62,8 +62,13 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len);
 void tcp_init(void);
 int tcp_listen(uint16_t port);
 struct tcp_socket* tcp_find_listener(uint16_t port);
+struct tcp_socket* tcp_find_connection(uint32_t src_ip, uint32_t dst_ip, uint16_t src_port, uint16_t dst_port);
+struct tcp_socket* tcp_accept(void);
+
 void tcp_dump_table(void);
 
 int tcp_send_syn_ack(int fd, struct tcp_socket *conn);
+
+
 
 #endif /* TCP_H */

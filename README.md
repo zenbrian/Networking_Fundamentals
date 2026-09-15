@@ -75,8 +75,8 @@ My Network Stack
 | [Day 07](docs/Day07.md) | IPv4 Checksum | 實作 RFC 791 Header Checksum |
 | [Day 08](docs/Day08.md) | ICMP Header | 解析 Echo Request 與 Echo Reply |
 | [Day 09](docs/Day09.md) | Ping Reply | 回應 `ping 10.0.0.2` |
-| Day 10 | TTL | 實作 TTL 遞減並理解 Traceroute 原理 |
-| Day 11 | Routing | 理解 Local Network、Gateway、Default Route |
+| [Day 10](docs/Day10.md) | TTL | 實作 TTL 遞減並理解 Traceroute 原理 |
+| [Day 11](docs/Day11.md) | Routing | 理解 Local Network、Gateway、Default Route |
 
 ### Phase 3：UDP（Day 12 ~ Day 15）
 
@@ -87,7 +87,7 @@ My Network Stack
 | [Day 12](docs/Day12.md) | UDP Header | 解析 Source Port、Destination Port、Length、Checksum |
 | [Day 13](docs/Day13.md) | UDP Receiver | 接收 UDP 封包並交付 Application Callback |
 | [Day 14](docs/Day14.md) | UDP Sender | 主動送出 UDP 封包，並用 `nc -lu 9999` 驗證 |
-| Day 15 | Mini DNS Client | 查詢 `google.com` 並解析 DNS 回應 |
+| [Day 15](docs/Day15.md) | Mini DNS Client | 查詢 `google.com` 並解析 DNS 回應 |
 
 ### Phase 4：TCP 核心（Day 16 ~ Day 25）
 
@@ -95,11 +95,11 @@ My Network Stack
 
 | Day | 主題 | 目標 |
 |---|---|---|
-| Day 16 | TCP Header | 解析 SEQ、ACK、Window、Flags |
-| Day 17 | TCP State Machine | 建立 LISTEN、SYN_RECEIVED、ESTABLISHED 狀態 |
-| Day 18 | SYN | 接收 SYN 封包 |
-| Day 19 | SYN-ACK | 回覆 SYN ACK |
-| Day 20 | 3-Way Handshake | 完成 TCP 三向交握 |
+| [Day 16](docs/Day16.md) | TCP Header | 解析 SEQ、ACK、Window、Flags |
+| [Day 17](docs/Day17.md) | TCP State Machine | 建立 LISTEN、SYN_RECEIVED、ESTABLISHED 狀態 |
+| [Day 18](docs/Day18.md) | TCP Three-Way Handshake (Part 1) | 收到 SYN，回覆 SYN-ACK |
+| [Day 19](docs/Day19.md) | TCP Three-Way Handshake (Part 2) | 收到 ACK，進入 ESTABLISHED |
+| Day 20 | TCP Data Transfer | 接收 TCP Payload 資料與回覆 ACK |
 | Day 21 | TCP Payload | 接收 TCP Data |
 | Day 22 | Sequence Number | 管理 SEQ 與 ACK |
 | Day 23 | TCP Retransmission | 實作 Timeout 與 Retransmit |

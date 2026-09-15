@@ -59,6 +59,32 @@ struct tcp_socket* tcp_create_connection(uint32_t src_ip, uint32_t dst_ip,uint16
     return NULL;
 }
 
+struct tcp_socket* tcp_find_connection(uint32_t src_ip, uint32_t dst_ip, uint16_t src_port, uint16_t dst_port)
+{
+    for (int i = 0; i < MAX_TCP_SOCKETS; i++) {
+        if (tcp_table[i].state != TCP_CLOSED && tcp_table[i].state != TCP_LISTEN) {
+            if (tcp_table[i].src_ip == src_ip &&
+                tcp_table[i].dst_ip == dst_ip &&
+                tcp_table[i].src_port == src_port &&
+                tcp_table[i].dst_port == dst_port) {
+                return &tcp_table[i];
+            }
+        }
+    }
+    return NULL;
+}
+struct tcp_socket* tcp_accept(void)
+{
+    for (int i = 0; i < MAX_TCP_SOCKETS; i++) {
+        if (tcp_table[i].state == TCP_ESTABLISHED) {
+            return &tcp_table[i];
+        }
+    }
+    return NULL;
+}
+
+
+
 void tcp_dump_table(void)
 {
     printf("\n=== TCP SOCKET TABLE ===\n");
@@ -170,6 +196,36 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
 
 
         return;
+    }
+
+    if ((tcp->flags & TCP_ACK) && !(tcp->flags & TCP_SYN)) {
+        uint16_t src_port = ntohs(tcp->src_port);
+        uint16_t dst_port = ntohs(tcp->dst_port);
+        // 1. 透過四元組尋找是否已有這條連線
+        struct tcp_socket *conn = tcp_find_connection(ip->src_ip, ip->dst_ip, src_port, dst_port);
+        if (conn == NULL) {
+            printf("[TCP] No matching connection for ACK -> DROP\n");
+            return;
+        }
+        // 2. 檢查狀態是否正在等待第三次交握 (SYN_RECEIVED)
+        if (conn->state == TCP_SYN_RECEIVED) {
+            uint32_t ack_num = ntohl(tcp->ack);
+            uint32_t expected_ack = conn->seq + 1; // 5000 + 1 = 5001
+            // 3. 驗證 ACK 號碼是否正確
+            if (ack_num != expected_ack) {
+                printf("[TCP] Invalid ACK number: %u (expected %u) -> DROP\n", ack_num, expected_ack);
+                return;
+            }
+            // 4. 握手成功！狀態轉移到 ESTABLISHED
+            conn->state = TCP_ESTABLISHED;
+            conn->seq++; // 消耗掉 SYN 的序號，自己的 SEQ 正式推進到 5001
+            printf("\n========================================\n");
+            printf("[TCP] ACK Received! Handshake Complete!\n");
+            printf("[TCP] Connection Established: State -> ESTABLISHED\n");
+            printf("========================================\n\n");
+            tcp_dump_table();
+            return;
+        }
     }
 }
 
