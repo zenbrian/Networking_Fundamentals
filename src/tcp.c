@@ -152,6 +152,15 @@ void tcp_print_header(const struct tcp_hdr *tcp)
     printf("----------------------------------------\n");
 }
 
+void tcp_dump_payload(const uint8_t *data, size_t len)
+{
+    printf("\n[TCP DATA]\n");
+    fwrite(data, 1, len, stdout);
+    printf("\n");
+    fflush(stdout);
+}
+
+
 void tcp_receive(int fd, const uint8_t *buffer, size_t len)
 {
     // 取得 IPv4 標頭以計算實際 IP Header 長度
@@ -170,6 +179,14 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
 
     struct tcp_hdr *tcp = (struct tcp_hdr *)(buffer + ETH_HEADER_LEN + ip_hdr_len);
     tcp_print_header(tcp);
+
+    size_t tcp_hdr_len = (tcp->data_offset >> 4) * 4;
+    const uint8_t *payload = (const uint8_t *)tcp + tcp_hdr_len;
+    uint16_t ip_total_len = ntohs(ip->total_length);
+    size_t payload_len = 0;
+    if (ip_total_len >= ip_hdr_len + tcp_hdr_len) {
+        payload_len = ip_total_len - ip_hdr_len - tcp_hdr_len;
+    }
 
     if (tcp->flags & TCP_SYN) {
         uint16_t dst_port = ntohs(tcp->dst_port);
@@ -226,6 +243,19 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
             tcp_dump_table();
             return;
         }
+        if (conn->state == TCP_ESTABLISHED) {
+            if (payload_len > 0) {
+                printf("\n[TCP] Received Payload, Length = %zu bytes\n", payload_len);
+                tcp_dump_payload(payload, payload_len);
+                // 更新 ACK 號碼
+                uint32_t received_seq = ntohl(tcp->seq);
+                conn->ack = received_seq + payload_len;
+                // 回傳 ACK 封包
+                tcp_send_ack(fd, conn);
+            }
+            return;
+        }
+
     }
 }
 
@@ -277,5 +307,64 @@ int tcp_send_syn_ack(int fd, struct tcp_socket *conn){
     printf("[TCP] Sent SYN-ACK: SEQ=%u, ACK=%u\n", conn->seq, conn->ack);
     return 0;
 
+}
+
+int tcp_send_ack(int fd, struct tcp_socket *conn)
+{
+    // 1. 準備 Buffer 與切割各層指標
+    uint8_t buffer[ETH_HEADER_LEN + sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr)];
+    memset(buffer, 0, sizeof(buffer));
+
+    struct ethernet_hdr *eth = (struct ethernet_hdr *)buffer;
+    struct ipv4_hdr *ip = (struct ipv4_hdr *)(buffer + ETH_HEADER_LEN);
+    struct tcp_hdr *tcp = (struct tcp_hdr *)(buffer + ETH_HEADER_LEN + sizeof(struct ipv4_hdr));
+
+    // 2. 封裝 TCP Header (純 ACK，無 Payload)
+    tcp->src_port = htons(conn->dst_port);
+    tcp->dst_port = htons(conn->src_port);
+    tcp->seq = htonl(conn->seq); // Client 回傳 ACK，SEQ 通常是上一次收到的 SEQ + 1
+    tcp->ack = htonl(conn->ack); // 加上 Server SEQ
+    tcp->data_offset = (5 << 4); // 只有 Header
+    tcp->window = htons(4096);
+    tcp->flags = TCP_ACK; // 純 ACK Flag
+    tcp->checksum = 0;
+    tcp->urgent_ptr = 0;
+
+    // 3. 封裝 Layer 3: IPv4 Header
+    ip->version_ihl = (4 << 4) | 5;
+    ip->tos = 0;
+    ip->total_length = htons(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
+    ip->identification = htons(2002); // 隨意編號
+    ip->flags_fragment = 0;
+    ip->ttl = 64;
+    ip->protocol = IPPROTO_TCP; // 6: TCP
+    ip->src_ip = conn->dst_ip;
+    ip->dst_ip = conn->src_ip;
+    ip->checksum = 0;
+    ip->checksum = ipv4_checksum(ip, sizeof(struct ipv4_hdr));
+
+    // 4. 封裝 Layer 2: Ethernet Header
+    struct arp_entry *entry = arp_table_lookup((const uint8_t *)&conn->src_ip);
+    if (!entry || !entry->valid) {
+        printf("[TCP] Send ACK failed: MAC not in ARP table\n");
+        return -1;
+    }
+    memcpy(eth->dst, entry->mac, ETH_ADDR_LEN);
+    memcpy(eth->src, LOCAL_MAC, ETH_ADDR_LEN);
+    eth->ethertype = htons(ETHERTYPE_IPV4);
+
+    // 5. 寫出到虛擬網卡
+    ssize_t sent = write(fd, buffer, sizeof(buffer));
+    if (sent < 0) {
+        perror("[TCP] write ACK failed");
+        return -1;
+    }
+
+    // 更新狀態？(Optional，視需求)
+    // conn->state = TCP_ESTABLISHED;
+
+    printf("[TCP] Sent ACK: SEQ=%u, ACK=%u\n", conn->seq, conn->ack);
+
+    return 0;
 }
 

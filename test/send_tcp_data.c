@@ -158,6 +158,98 @@ int main(void)
         printf("\n三向交握封包全數發送完畢！請查看 ./network 終端機狀態！\n\n");
     }
 
+        /* ========================================================
+     * 第四步：連線已 ESTABLISHED，Client 發送 HTTP GET 請求！
+     * ======================================================== */
+    const char *http_req = "GET / HTTP/1.1\r\nHost: 10.0.0.2\r\n\r\n";
+    size_t req_len = strlen(http_req);
+
+    // Buffer 大小 = L2 + L3 + L4 + Payload 長度
+    unsigned char data_frame[ETH_HEADER_LEN + sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr) + req_len];
+    memset(data_frame, 0, sizeof(data_frame));
+
+    struct ethernet_hdr *d_eth = (struct ethernet_hdr *)data_frame;
+    struct ipv4_hdr *d_ip = (struct ipv4_hdr *)(data_frame + ETH_HEADER_LEN);
+    struct tcp_hdr *d_tcp = (struct tcp_hdr *)(data_frame + ETH_HEADER_LEN + sizeof(struct ipv4_hdr));
+    uint8_t *d_payload = data_frame + ETH_HEADER_LEN + sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr);
+
+    // 複製 HTTP Payload
+    memcpy(d_payload, http_req, req_len);
+
+    // Ethernet
+    memcpy(d_eth->dst, LOCAL_MAC, ETH_ADDR_LEN);
+    memcpy(d_eth->src, sender_mac, ETH_ADDR_LEN);
+    d_eth->ethertype = htons(ETHERTYPE_IPV4);
+
+    // IPv4 (注意 total_length 要加上 req_len！)
+    d_ip->version_ihl = 0x45;
+    d_ip->tos = 0;
+    d_ip->total_length = htons(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr) + req_len);
+    d_ip->identification = htons(1003);
+    d_ip->flags_fragment = 0;
+    d_ip->ttl = 64;
+    d_ip->protocol = IPPROTO_TCP;
+    d_ip->src_ip = inet_addr("10.0.0.1");
+    d_ip->dst_ip = inet_addr("10.0.0.2");
+    d_ip->checksum = 0;
+    d_ip->checksum = ipv4_checksum(d_ip, sizeof(struct ipv4_hdr));
+
+    // TCP (Flags 可以是 TCP_ACK 或 TCP_ACK | TCP_PSH)
+    d_tcp->src_port = htons(client_port);
+    d_tcp->dst_port = htons(server_port);
+    d_tcp->seq = htonl(client_seq + 1); // 1001
+    d_tcp->ack = htonl(server_seq + 1); // 5001
+    d_tcp->data_offset = (5 << 4);
+    d_tcp->flags = TCP_ACK | TCP_PSH;
+    d_tcp->window = htons(4096);
+    d_tcp->checksum = 0;
+    d_tcp->urgent_ptr = 0;
+
+    printf("[4/4 Client] 發送 HTTP Request (%zu bytes) 到 tap0...\n", req_len);
+    if (sendto(sockfd, data_frame, sizeof(data_frame), 0, (struct sockaddr *)&sll, sizeof(sll)) < 0) {
+        perror("sendto Data");
+    }
+        /* ========================================================
+     * 第五步：等待 Server 回傳確認資料收到的純 ACK
+     * ======================================================== */
+    printf("[5/4 Client] 等待 Server 回傳資料的 ACK...\n");
+    uint32_t expected_data_ack = (client_seq + 1) + req_len; // 1001 + 32 = 1033
+
+    while (1) {
+        unsigned char rx_buf[2048];
+        ssize_t n = recv(sockfd, rx_buf, sizeof(rx_buf), 0);
+        if (n < (ssize_t)(ETH_HEADER_LEN + sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr)))
+            continue;
+
+        struct ethernet_hdr *rx_eth = (struct ethernet_hdr *)rx_buf;
+        if (ntohs(rx_eth->ethertype) != ETHERTYPE_IPV4)
+            continue;
+
+        struct ipv4_hdr *rx_ip = (struct ipv4_hdr *)(rx_buf + ETH_HEADER_LEN);
+        if (rx_ip->protocol != IPPROTO_TCP)
+            continue;
+
+        size_t rx_ip_len = (rx_ip->version_ihl & 0x0F) * 4;
+        struct tcp_hdr *rx_tcp = (struct tcp_hdr *)(rx_buf + ETH_HEADER_LEN + rx_ip_len);
+
+        // 檢查是否是 Server 回給我們的 ACK
+        if (ntohs(rx_tcp->dst_port) == client_port && ntohs(rx_tcp->src_port) == server_port) {
+            if (rx_tcp->flags & TCP_ACK) {
+                uint32_t acked = ntohl(rx_tcp->ack);
+                printf("\n========================================\n");
+                printf("[Client] 成功收到 Server 回傳的 ACK！(ACK=%u)\n", acked);
+                if (acked == expected_data_ack) {
+                    printf("[Client] 驗證成功！Server 正確確認了全部 %zu bytes 資料 (1001 + %zu = %u)！\n",
+                           req_len, req_len, expected_data_ack);
+                } else {
+                    printf("[Client] 警告：ACK 號碼不符 (收到 %u, 期望 %u)\n", acked, expected_data_ack);
+                }
+                printf("========================================\n\n");
+                break;
+            }
+        }
+    }
+
     close(sockfd);
     return 0;
 }

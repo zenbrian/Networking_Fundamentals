@@ -58,6 +58,7 @@ struct tcp_socket
 /* 印出 TCP 標頭資訊 */
 void tcp_print_header(const struct tcp_hdr *tcp);
 void tcp_receive(int fd, const uint8_t *buffer, size_t len);
+void tcp_dump_payload(const uint8_t *data, size_t len);
 
 void tcp_init(void);
 int tcp_listen(uint16_t port);
@@ -68,6 +69,7 @@ struct tcp_socket* tcp_accept(void);
 void tcp_dump_table(void);
 
 int tcp_send_syn_ack(int fd, struct tcp_socket *conn);
+int tcp_send_ack(int fd, struct tcp_socket *conn);
 
 
 
