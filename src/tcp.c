@@ -252,6 +252,9 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
                 conn->ack = received_seq + payload_len;
                 // 回傳 ACK 封包
                 tcp_send_ack(fd, conn);
+
+                // ★ 在這裡加入你的主動發送！
+                tcp_send_data(fd, conn);
             }
             return;
         }
@@ -368,3 +371,71 @@ int tcp_send_ack(int fd, struct tcp_socket *conn)
     return 0;
 }
 
+int tcp_send(int fd, struct tcp_socket *conn, const uint8_t *data, size_t len){
+    // 1. 計算總長度：L2 (14) + L3 (20) + L4 (20) + 應用層資料長度 (len)
+    size_t total_len = ETH_HEADER_LEN + sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr) + len;
+    uint8_t buffer[total_len];
+    memset(buffer, 0, total_len);
+    
+     // 2. 切割記憶體指標（把長紙帶切分成四段）
+    struct ethernet_hdr *eth = (struct ethernet_hdr *)buffer;
+    struct ipv4_hdr *ip = (struct ipv4_hdr *)(buffer + ETH_HEADER_LEN);
+    struct tcp_hdr *tcp = (struct tcp_hdr *)(buffer + ETH_HEADER_LEN + sizeof(struct ipv4_hdr));
+     // 3. payload 指標緊接在 TCP Header 後面
+    uint8_t *payload = buffer + ETH_HEADER_LEN + sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr);
+    
+    // 4. 搬移應用層資料到 Payload 區域
+    memcpy(payload, data, len); 
+
+    //封裝tcp
+    tcp->src_port = htons(conn->dst_port);
+    tcp->dst_port = htons(conn->src_port);
+    tcp->seq = htonl(conn->seq); 
+    tcp->ack = htonl(conn->ack); 
+    tcp->data_offset = ((sizeof(struct tcp_hdr)) / 4 << 4);
+    tcp->flags = TCP_ACK | TCP_PSH;        // ACK + PSH
+    tcp->window = htons(4096);
+    tcp->checksum = 0;
+    tcp->urgent_ptr = 0;
+
+    //封裝IPv4
+    ip->version_ihl = (4 << 4) | 5;
+    ip->tos = 0;
+    ip->total_length = htons(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr) + len);
+    ip->identification = htons(2003); // 隨意編號
+    ip->flags_fragment = 0;
+    ip->ttl = 64;
+    ip->protocol = IPPROTO_TCP; // 6: TCP
+    ip->src_ip = conn->dst_ip;
+    ip->dst_ip = conn->src_ip;
+    ip->checksum = 0;
+    ip->checksum = ipv4_checksum(ip, sizeof(struct ipv4_hdr));
+
+    //封裝封裝 Ethernet Header
+    struct arp_entry *entry = arp_table_lookup((const uint8_t *)&conn->src_ip);
+    if (!entry || !entry->valid) {
+        printf("[TCP] Send Data failed: MAC not in ARP table\n");
+        return -1;
+    }
+    memcpy(eth->dst, entry->mac, ETH_ADDR_LEN);
+    memcpy(eth->src, LOCAL_MAC, ETH_ADDR_LEN);
+    eth->ethertype = htons(ETHERTYPE_IPV4);
+    
+    // 5. 寫出到虛擬網卡
+    ssize_t sent = write(fd, buffer, sizeof(buffer));
+    if (sent < 0) {
+        perror("[TCP] write Data failed");
+        return -1;
+    }
+    
+    conn->seq += len;
+    printf("[TCP] Sent Data: %zu bytes | New SEQ=%u, ACK=%u\n", len, conn->seq, conn->ack);
+    return 0;
+
+}
+
+void tcp_send_data(int fd, struct tcp_socket *conn)
+{
+    const char *msg = "Hello from My TCP Stack\n";
+    tcp_send(fd, conn, (const uint8_t *)msg, strlen(msg));
+}

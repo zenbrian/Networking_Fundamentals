@@ -250,6 +250,44 @@ int main(void)
         }
     }
 
+    /* ========================================================
+     * 第六步：等待接收 Server 主動回傳的 Payload！
+     * ======================================================== */
+    printf("[6/4 Client] 等待 Server 回傳應用層資料 (Data Segment)...\n");
+    while (1) {
+        unsigned char rx_buf[2048];
+        ssize_t n = recv(sockfd, rx_buf, sizeof(rx_buf), 0);
+        if (n < (ssize_t)(ETH_HEADER_LEN + sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr)))
+            continue;
+
+        struct ethernet_hdr *rx_eth = (struct ethernet_hdr *)rx_buf;
+        if (ntohs(rx_eth->ethertype) != ETHERTYPE_IPV4)
+            continue;
+
+        struct ipv4_hdr *rx_ip = (struct ipv4_hdr *)(rx_buf + ETH_HEADER_LEN);
+        if (rx_ip->protocol != IPPROTO_TCP)
+            continue;
+
+        size_t rx_ip_len = (rx_ip->version_ihl & 0x0F) * 4;
+        struct tcp_hdr *rx_tcp = (struct tcp_hdr *)(rx_buf + ETH_HEADER_LEN + rx_ip_len);
+
+        if (ntohs(rx_tcp->dst_port) == client_port && ntohs(rx_tcp->src_port) == server_port) {
+            size_t rx_tcp_len = (rx_tcp->data_offset >> 4) * 4;
+            size_t rx_payload_len = ntohs(rx_ip->total_length) - rx_ip_len - rx_tcp_len;
+
+            // 只要有收到資料 (Payload > 0)
+            if (rx_payload_len > 0) {
+                uint8_t *rx_payload = rx_buf + ETH_HEADER_LEN + rx_ip_len + rx_tcp_len;
+                printf("\n[Client 成功收到 Server 回覆！]\n");
+                printf("長度：%zu Bytes | SEQ=%u, ACK=%u\n", rx_payload_len, ntohl(rx_tcp->seq), ntohl(rx_tcp->ack));
+                printf("內容：");
+                fwrite(rx_payload, 1, rx_payload_len, stdout);
+                printf("\n================================================\n\n");
+                break;
+            }
+        }
+    }
+
     close(sockfd);
     return 0;
 }

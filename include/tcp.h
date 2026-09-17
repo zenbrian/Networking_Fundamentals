@@ -70,7 +70,8 @@ void tcp_dump_table(void);
 
 int tcp_send_syn_ack(int fd, struct tcp_socket *conn);
 int tcp_send_ack(int fd, struct tcp_socket *conn);
-
+int tcp_send(int fd, struct tcp_socket *conn, const uint8_t *data, size_t len);
+void tcp_send_data(int fd, struct tcp_socket *conn);
 
 
 #endif /* TCP_H */
