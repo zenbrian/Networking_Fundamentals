@@ -16,6 +16,19 @@ Ethernet
 
 今天（Day 16），我們正式踏入網際網路最核心、最龐大的傳輸層協定 —— **TCP（Transmission Control Protocol，傳輸控制協定）**！
 
+接下來 Day16～Day21 會形成一個 TCP 小系列：
+
+```text
+Day16：讀懂 TCP Header，完成 TCP 封包接收與解析
+Day17：建立 TCP Socket Table 與 TCP State Machine
+Day18：收到 SYN 後建立連線槽位，並回覆 SYN-ACK
+Day19：收到最後 ACK，進入 ESTABLISHED
+Day20：在 ESTABLISHED 狀態接收 Payload，並回傳 ACK
+Day21：主動送出 Payload，完成最小雙向資料傳輸
+```
+
+這個小系列的目標是先做出「最小可觀察、可理解」的 TCP 教學模型，而不是一次補齊真實 Kernel TCP 的所有機制。
+
 現代網際網路幾乎所有重要的應用都建立在 TCP 之上：
 ```text
 HTTP / HTTPS (Web 瀏覽)
@@ -38,13 +51,12 @@ Ethernet
 
 # 今日學習目標與成果
 
-- [x] **掌握 TCP 與 UDP 的本質差異**：從「寄信」到「掛號電話」，理解可靠傳輸、順序控制與流量控制的代價與設計思維。
-- [x] **實作 RFC 793 標準 20-Byte TCP Header 結構（`struct tcp_hdr`）**：使用 `__attribute__((packed))` 精確對齊網路二進位規格。
-- [x] **深入拆解 TCP 核心欄位**：徹底理解 Source/Destination Port、Sequence Number（SEQ）、Acknowledgment Number（ACK）、Data Offset、Window Size、Checksum 與 Urgent Pointer 的物理意義。
-- [x] **解析 6 大核心 TCP Flags 儀表板**：逐 bit 剖析 SYN、ACK、FIN、RST、PSH、URG 的狀態開關與位元運算遮罩。
-- [x] **設計與 ICMP / UDP 一致的模組化接收架構（`tcp_receive`）**：封裝長度防護與 IP Header 動態位移，維持程式碼的高內聚性。
-- [x] **實作 TCP 專屬封包注入工具（`test/send_tcp_syn.c`）**：透過 Linux AF_PACKET Raw Socket 精確組裝並射出 TCP SYN 測試封包。
-- [x] **全鏈路驗收成功**：在 TAP 虛擬網卡上順利捕捉並完整解析出 `Src: 52144 -> Dst: 80, SYN=1, ACK=0, Window=4096`。
+- [x] 理解 TCP 與 UDP 的差異：連線、可靠性、位元組流與標頭大小。
+- [x] 定義最小 20 Bytes 的 `struct tcp_hdr`。
+- [x] 解析 TCP 主要欄位：Port、SEQ、ACK、Data Offset、Flags、Window、Checksum。
+- [x] 認識常見 TCP Flags：SYN、ACK、FIN、RST、PSH、URG。
+- [x] 實作 `tcp_receive()`，讓 IPv4 Protocol 6 封包進入 TCP 解析流程。
+- [x] 使用 `send_tcp_syn` 測試工具，在 TAP 上送入並解析第一個 TCP SYN 封包。
 
 ---
 
@@ -102,7 +114,7 @@ Ethernet
 - **TCP 最核心的靈魂欄位**。
 - TCP 將傳輸視為無窮無盡的「Byte 串流」。當一段資料被拆成數個封包時，網路環境可能會導致封包順序錯亂或遺失。
 - `SEQ` 標明了**「當前這包封包的第一個位元組，在整個資料流中是第幾個 Byte」**。接收端因此能精準拼裝還原原始資料，並發現遺失。
-- 在三次交握的第一步（SYN），雙方各自生成隨機的初始序號（ISN, Initial Sequence Number）。
+- 在三向交握的第一步（SYN），雙方各自生成隨機的初始序號（ISN, Initial Sequence Number）。
 - 讀取時需使用 `ntohl()`。
 
 #### (3) 確認號（Acknowledgment Number，ACK）— 32 bits (4 Bytes)
@@ -122,7 +134,9 @@ Ethernet
 - 當接收端消化不及，可宣告 `Window = 0`（Zero Window）迫使發送端暫停，防止接收端緩衝區溢位。
 
 #### (6) 校驗和（Checksum）— 16 bits (2 Bytes)
-- 涵蓋 TCP Header + TCP Payload，並結合包含來源/目的 IP 的「虛擬標頭（Pseudo Header）」進行 16-bit One's Complement 反相校驗，確保傳輸完全正確且未送錯主機。
+- TCP Checksum 與 IPv4 Header Checksum 不同：IPv4 Header Checksum **只保護 IPv4 Header 本身**；TCP Checksum 則涵蓋 **TCP Header + TCP Payload**，並額外結合包含來源/目的 IP、Protocol、TCP 長度的「虛擬標頭（Pseudo Header）」進行 16-bit One's Complement 反相校驗。
+- 因為加入了 Pseudo Header，TCP 可以檢查封包是否不只資料沒壞，還有沒有被送錯 IP 端點。
+- 本系列 Day16～Day21 的 TCP 教學版目前仍暫填 `tcp->checksum = 0`，測試工具也不驗證 TCP Checksum；若要與真實 OS TCP Stack 穩定互通，後續必須實作完整 TCP Pseudo Header Checksum。
 
 #### (7) 緊急指標（Urgent Pointer）— 16 bits (2 Bytes)
 - 當 Flags 的 `URG` 設為 1 時生效，標示緊急資料相對於 `SEQ` 的位移量（如傳送 `Ctrl + C` 中斷訊號）。
@@ -384,4 +398,4 @@ Frame length: 54 bytes
    - `SYN_SENT`
    - `SYN_RECEIVED`
    - `ESTABLISHED`
-3. **邁向三方交握（Three-Way Handshake）**：當收到 `SYN` 時，如何變更狀態並準備回覆 `SYN + ACK`！
+3. **邁向三向交握（Three-Way Handshake）**：當收到 `SYN` 時，如何變更狀態並準備回覆 `SYN + ACK`！

@@ -213,7 +213,7 @@ int main(void)
      * 第五步：等待 Server 回傳確認資料收到的純 ACK
      * ======================================================== */
     printf("[5/4 Client] 等待 Server 回傳資料的 ACK...\n");
-    uint32_t expected_data_ack = (client_seq + 1) + req_len; // 1001 + 32 = 1033
+    uint32_t expected_data_ack = (client_seq + 1) + req_len; // 1001 + 34 = 1035
 
     while (1) {
         unsigned char rx_buf[2048];

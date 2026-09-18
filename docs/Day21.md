@@ -2,7 +2,7 @@
 
 在 Day 20 中，我們的 TCP Stack 已經能夠接收客戶端發送的應用層資料（Payload），並成功計算出對應的累積確認號（ACK Number）回傳純 ACK。
 
-今天（Day 21），我們迎來了 TCP 實作的重大里程碑：**讓我們的 TCP Stack 第一次具備主動發送應用層資料（Send Payload）的能力，真正實現全雙工雙向資料傳輸！**
+今天（Day 21），我們迎來了 TCP 實作的重大里程碑：**讓我們的 TCP Stack 第一次具備主動發送應用層資料（Send Payload）的能力，完成教學版的最小雙向資料傳輸！**
 
 ```text
 Client                                             Server
@@ -258,21 +258,23 @@ Frame length: 88 bytes
 ================================================
 ```
 
-#### 💡 連續執行的關鍵觀察（Sequence 累加驗證）：
-在未重啟 `./network` 的情況下再次執行測試：
+#### 💡 同一條連線內的關鍵觀察（Sequence 累加驗證）：
+如果在同一條 `TCP_ESTABLISHED` 連線尚未關閉時，連續呼叫 `tcp_send()` 傳送資料，可以觀察到 Server 端 `conn->seq` 會依照 Payload 長度持續推進：
 ```text
 [TCP] Sent ACK: SEQ=5025, ACK=1035
 [TCP] Sent Data: 24 bytes | New SEQ=5049, ACK=1035
 ```
 * 第一次傳送：$5001 + 24 = 5025$
 * 第二次傳送：$5025 + 24 = 5049$
-* 證明了 `conn->seq += len` 完美維持了位元組流（Byte Stream）的連續性！
+* 這證明了 `conn->seq += len` 能在同一條 TCP 位元組流（Byte Stream）中維持連續性。
+
+> 若是重新建立一條新的 TCP 連線，真實 TCP 會為新連線建立新的 TCB 並選擇新的 ISN；不應把舊連線的 `seq` 直接延續到新連線。
 
 ---
 
 # 今日總結與明日預告
 
-今天我們完成了自製網路協定棧至關重要的里程碑 —— **主動封裝並傳送應用層資料**。現在我們的 TCP Stack 已經能夠完整支撐 HTTP Request-Response 的雙向通訊！
+今天我們完成了自製網路協定棧至關重要的里程碑 —— **主動封裝並傳送應用層資料**。現在我們的 TCP Stack 已經能夠示範最小化的 HTTP-like Request-Response 雙向通訊流程；不過它仍是教學版，尚未補齊 TCP Checksum、分段、重傳、擁塞控制、完整關閉流程與錯誤處理。
 
 ### Day 22 預告：
 在真實不可靠的網際網路中，封包可能會**延遲、重複、甚至亂序（Out-of-Order）到達**：

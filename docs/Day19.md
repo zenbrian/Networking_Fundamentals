@@ -22,7 +22,7 @@ Client                                  Server
   │                             (TCP 連線正式成功建立！)
 ```
 
-這代表我們的 TCP 協定棧不再只是「聽得見」和「說得出」，而是**正式具備了維持完整雙向可靠連線通道的能力**，這是自製 TCP/IP 協定棧中最重要的里程碑！
+這代表我們的 TCP 協定棧不再只是「聽得見」和「說得出」，而是**正式具備了最小化三向交握狀態轉換能力**，這是自製 TCP/IP 協定棧中非常重要的里程碑！
 
 ---
 
@@ -40,6 +40,7 @@ Client                                  Server
   - 執行 `conn->seq++`，將伺服器序列號推進至 `5001`，為後續資料傳輸鋪路。
 - [x] **實作 `tcp_accept()` 雛形**：
   - 為應用層（如未來的 HTTP Server）提供取得已就緒連線的介面。
+  - 目前版本只是回傳第一個 `TCP_ESTABLISHED` 連線，尚未實作真實 OS 中的 accept queue、blocking wakeup 與 backlog 管理。
 - [x] **撰寫三向交握自動測試程式 (`test/send_tcp_handshake.c`)**：
   - 模擬客戶端自動依序完成：發送 SYN $\rightarrow$ 等待接收 SYN-ACK $\rightarrow$ 發送最終 ACK。
 - [x] **實機全鏈路驗收成功**：

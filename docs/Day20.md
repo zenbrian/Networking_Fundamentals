@@ -14,9 +14,9 @@ Client                                             Server
   │    GET / HTTP/1.1\r\nHost: 10.0.0.2\r\n\r\n      │
   ├─────────────────────────────────────────────────>│  (解析 Data Offset，算出 Payload 長度)
   │                                                  │  (印出 [TCP DATA] 內容)
-  │                                                  │  (計算 ACK 號碼 = 1001 + 32 = 1033)
+  │                                                  │  (計算 ACK 號碼 = 1001 + 34 = 1035)
   │                                                  │
-  │ 3. ACK (SEQ=5001, ACK=1033)                      │
+  │ 3. ACK (SEQ=5001, ACK=1035)                      │
   │<─────────────────────────────────────────────────┤  (Server 回傳純 ACK，確認全部收妥！)
   │                                                  │
 ```
@@ -83,11 +83,14 @@ Client                                             Server
 
 TCP 是位元組流（Byte Stream）協定，序號代表的是「第幾個 Byte」：
 - 客戶端送出起始序號為 `SEQ = 1001` 的 HTTP GET 請求。
-- 請求內容 `"GET / HTTP/1.1\r\nHost: 10.0.0.2\r\n\r\n"` 共 **32 Bytes**。
-- 客戶端消耗的序號空間是 `1001 ~ 1032`。
+- 請求內容 `"GET / HTTP/1.1\r\nHost: 10.0.0.2\r\n\r\n"` 共 **34 Bytes**：
+  - `GET / HTTP/1.1\r\n` = 16 Bytes
+  - `Host: 10.0.0.2\r\n` = 16 Bytes
+  - 結尾空行 `\r\n` = 2 Bytes
+- 客戶端消耗的序號空間是 `1001 ~ 1034`。
 - 伺服器回覆的確認號碼公式：
-  $$\text{Next ACK} = \text{received\_seq} + \text{payload\_len} = 1001 + 32 = \mathbf{1033}$$
-- 這代表伺服器向客戶端宣告：**「1032 以前的位元組我全部收妥，請你下次從 1033 開始送！」**
+  $$\text{Next ACK} = \text{received\_seq} + \text{payload\_len} = 1001 + 34 = \mathbf{1035}$$
+- 這代表伺服器向客戶端宣告：**「1034 以前的位元組我全部收妥，請你下次從 1035 開始送！」**
 
 ---
 
@@ -160,6 +163,8 @@ int tcp_send_ack(int fd, struct tcp_socket *conn)
 
 ### 2. 在 `tcp_receive()` 處理資料傳輸
 
+TCP Payload 長度應該依照 IPv4 Header 裡的 `total_length` 計算，而不是依照 Ethernet Frame Length。原因是 Ethernet Frame 可能包含 L2 padding 或其他鏈路層資訊；真正屬於 IPv4 packet 的範圍，應由 IPv4 自己的 `total_length` 定義。
+
 ```c
     // 計算 TCP Header 長度與 Payload 位置
     size_t tcp_hdr_len = (tcp->data_offset >> 4) * 4;
@@ -213,13 +218,13 @@ sudo ./send_tcp_data
 [TCP] ACK Received! Handshake Complete!
 [TCP] Connection Established: State -> ESTABLISHED
 
-[TCP] Received Payload, Length = 32 bytes
+[TCP] Received Payload, Length = 34 bytes
 
 [TCP DATA]
 GET / HTTP/1.1
 Host: 10.0.0.2
 
-[TCP] Sent ACK: SEQ=5001, ACK=1033
+[TCP] Sent ACK: SEQ=5001, ACK=1035
 ```
 
 #### `./send_tcp_data` 測試終端機：
@@ -229,12 +234,12 @@ Host: 10.0.0.2
 [2/3 Client] 收到 Server 的 SYN-ACK！(Server SEQ=5000, ACK=1001)
 [3/3 Client] 發送最終 ACK (SEQ=1001, ACK=5001) 完成三向交握！
 
-[4/4 Client] 發送 HTTP Request (32 bytes) 到 tap0...
+[4/4 Client] 發送 HTTP Request (34 bytes) 到 tap0...
 [5/4 Client] 等待 Server 回傳資料的 ACK...
 
 ========================================
-[Client] 成功收到 Server 回傳的 ACK！(ACK=1033)
-[Client] 驗證成功！Server 正確確認了全部 32 bytes 資料 (1001 + 32 = 1033)！
+[Client] 成功收到 Server 回傳的 ACK！(ACK=1035)
+[Client] 驗證成功！Server 正確確認了全部 34 bytes 資料 (1001 + 34 = 1035)！
 ========================================
 ```
 
@@ -242,7 +247,7 @@ Host: 10.0.0.2
 
 # 今日總結與明日預告
 
-今天我們成功實現了從 TCP 標頭解析 Payload，並根據收到的長度推進 ACK 序號且回覆純 ACK，這是整個協定棧能處理真實資料傳輸的起點！
+今天我們成功實現了從 TCP 標頭解析 Payload，並根據收到的長度推進 ACK 序號且回覆純 ACK，這是整個協定棧能處理真實資料傳輸的起點！本日仍假設資料按序抵達，尚未處理亂序、重複封包與重組；這些可靠性細節會留到後續的 TCP Receive Buffer / Reassembly 主題。
 
 ### Day 21 預告：
 今天我們是**被動接收資料並確認**。明天（Day 21），我們將實作 **TCP Send（主動傳送資料）**！

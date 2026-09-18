@@ -28,13 +28,14 @@ Client                                  Server
   - **SYN-ACK**：一兼二顧！既確認對方的連線請求，同時也告知對方我方的手錶序號（Initial Sequence Number, ISN）。
 - [x] **釐清序號消耗機制（為什麼 ACK 是 Client SEQ + 1）**：
   - 即使 SYN 封包 Payload 長度為 0，但依照 RFC 793 規定，**SYN 與 FIN 控制旗標各自必須消耗 1 個 Sequence Number**（將其視為一張建立契約）。
-- [x] **破除常見迷思：三次交握是否有帶 Data？**：
+- [x] **破除常見迷思：三向交握是否有帶 Data？**：
   - 交握過程原則上**不帶任何應用層資料（Length = 0）**。
   - 核心目的純粹是**確認雙方的雙向收發能力均暢通**，交握完成進入 `ESTABLISHED` 後才開始傳送真實 Data。
 - [x] **實作 `tcp_send_syn_ack()` 封包發射器**：
   - 由內而外完成 L4 TCP Header $\rightarrow$ L3 IPv4 Header $\rightarrow$ L2 Ethernet Header 封裝。
   - 正確將來源與目的 IP / Port 反轉（Server $\rightarrow$ Client）。
   - 設定 Flags 為 `TCP_SYN | TCP_ACK`（`0x12`）。
+  - 本日先聚焦交握封包格式與狀態流程，TCP Checksum 仍暫填 `0`，完整 Pseudo Header Checksum 留待後續補強。
 - [x] **無縫整合 ARP 動態學習機制**：
   - 收到 SYN 時第一時間將 Client 的 IP 與 MAC 記錄到 `arp_table`（`arp_table_insert`），回覆時直接命中快取。
 - [x] **雙終端機與 tcpdump 全鏈路實測驗收**：
@@ -45,7 +46,7 @@ Client                                  Server
 
 # 核心概念深入剖析
 
-### 1. 三次交握（Three-Way Handshake）在確認什麼？
+### 1. 三向交握（Three-Way Handshake）在確認什麼？
 
 為什麼 TCP 不能只交握兩次？一定要三次？  
 想像兩個人在山頭用無線電對話，在講正事（傳資料）前必須確認通道暢通：
@@ -86,6 +87,8 @@ Client                                  Server
 | **TCP Flags** | `0x02` (`SYN`) | `0x12` (`SYN | ACK`) | 雙旗標同時打勾 |
 | **TCP SEQ** | `1000` | `5000` | Server 自己的起始序號 |
 | **TCP ACK** | `0` | `1001` | $\text{Client SEQ} + 1$ |
+
+> **Checksum 補充**：IPv4 Header Checksum 與 TCP Checksum 是兩件事。本文程式碼已重算 IPv4 Header Checksum，但 TCP Header 內的 `checksum` 仍暫填 `0`。這是 Day18～Day21 測試環境的教學簡化；真實 TCP 封包必須計算包含 Pseudo Header、TCP Header 與 Payload 的 TCP Checksum，否則一般 OS TCP Stack 可能會丟棄封包。
 
 ---
 
@@ -330,7 +333,7 @@ listening on tap0, link-type EN10MB (Ethernet), snapshot length 262144 bytes
 # Day 19 預告：完成三向交握 — 迎來 ESTABLISHED 狀態！
 
 今天我們完成了「SYN $\rightarrow$ SYN-ACK」這前兩步。  
-明天，我們將收下三方交握的最後一塊拼圖：
+明天，我們將收下三向交握的最後一塊拼圖：
 
 ```text
 Client                     Server
@@ -346,4 +349,4 @@ ACK ----------------------> (State: ESTABLISHED 🎉)
    - 尋找處於 `SYN_RECEIVED` 狀態的連線 Socket。
    - 驗證 Client 的 ACK 號碼是否正確確認了我們的 `seq + 1`（5001）。
 2. **連線狀態正式轉移為 `TCP_ESTABLISHED`**！
-3. 你的協定棧將第一次真正建立起一條完整合規的 TCP 連線，為後續傳輸 HTTP 資料鋪平道路！
+3. 你的協定棧將第一次建立起一條**具備最小化三向交握狀態轉換能力的 TCP 連線**，為後續傳輸 HTTP 資料鋪平道路！

@@ -5,37 +5,34 @@
 Application ──► UDP ──► IPv4 ──► Ethernet ──► TAP
 ```
 
-然而在過去 14 天中，我們每一次測試都是手動把目的 IP（如 `10.0.0.1`、`10.0.0.2`）寫死在程式碼或指令裡。
+過去我們測試時，目的 IP 幾乎都寫死在程式碼或指令裡。今天（Day 15），我們要進入第一個應用層協定：**Mini DNS Client**，學會把 `google.com` 這種網域名稱轉成真正可連線的 IP 位址。
 
-今天（Day 15），我們正式打造了第一個建立在 UDP 之上的**應用層協定（L7 Application Layer）—— Mini DNS Client**！
+今天的重點是 **DNS Payload 的 RFC 1035 編碼、組包與解析**。傳輸部分先使用 Linux 標準 UDP Socket（`sendto` / `recvfrom`），不直接接進自製 TAP/UDP 發送路徑。
+
 ```text
-Application (DNS Client)
+Application (Mini DNS Client)
            │
-          DNS
+          DNS Payload
            │
-          UDP (Port 53)
+ Linux UDP Socket (sendto / recvfrom)
            │
-          IPv4
+      Host Kernel Network Stack
            │
-        Ethernet
-           │
-          TAP / Host Network
+      Google DNS 8.8.8.8:53
 ```
 
-我們的網路堆疊第一次具備了將人類可讀的網域名稱（`google.com`）透過標準 RFC 1035 通訊協定，向全世界最大的公共伺服器（Google DNS `8.8.8.8:53`）進行即時查詢，並成功解析出真實的網際網路 IP 位址！
+簡單說：**DNS 內容我們自己做，UDP/IP/Ethernet 傳輸先交給 Linux Kernel。**
 
 ---
 
 # 今日學習目標與成果
 
-- [x] **理解 DNS 系統本質與運作流程**：釐清電腦本地沒有全世界對照表時，如何透過預設 DNS 伺服器突破「雞生蛋、蛋生雞」的連網第一步。
-- [x] **掌握 RFC 1035 標準 12-Byte DNS Header**：定義交易識別碼（ID）、標誌（Flags）及各區段計數器（QDCOUNT, ANCOUNT 等）。
-- [x] **深入剖析 16-bit Flags 儀表板**：逐 bit 拆解 QR、Opcode、RD、RA 與 RCODE，理解發送端 `0x0100` 與接收端 `0x8180` 的精確意義。
-- [x] **實作網域名稱長度標籤編碼器（`dns_encode_name`）**：將一般網址轉換為 Length-prefixed 格式（如 `google.com` ➔ `06 google 03 com 00`），並以單元測試獨立驗證。
-- [x] **動態組裝完整的 DNS Question（`dns_build_query`）**：利用指標位移 `qtrailer_ptr = qname_ptr + name_len`，安全填充 QTYPE (Type A) 與 QCLASS (Class IN)。
-- [x] **擬真工業級隨機 Transaction ID**：採用 `rand() & 0xFFFF` 避免可預測 ID，防範經典的 DNS 快取毒害攻擊（DNS Cache Poisoning）。
-- [x] **解析 DNS 回覆與壓縮指標（Compression Pointer `0xc0`）**：實作 `dns_parse_response` 跳過問題區段、處理 2-byte 指標跳轉、解析 Type A 與 CNAME，精確提取 4-byte IPv4 位址。
-- [x] **實測見證 DNS 負載平衡（Round-Robin）與高可用性**：成功解析 `google.com`，驗證程式穩定處理單筆 44 Bytes 及多筆 6 組 IP（124 Bytes）的回覆。
+- [x] 理解 DNS 如何把網域名稱解析成 IPv4 位址。
+- [x] 認識 RFC 1035 DNS Header、Flags 與 Question Section。
+- [x] 實作 `dns_encode_name()`，將 `google.com` 轉成 DNS length-prefixed label 格式。
+- [x] 實作 `dns_build_query()`，組出可送往 `8.8.8.8:53` 的 Type A 查詢。
+- [x] 實作 `dns_parse_response()`，解析 Answer RR、Compression Pointer 與 IPv4 RDATA。
+- [x] 透過 Linux UDP Socket 實測查詢 `google.com`，觀察多筆 DNS A Record 回覆。
 
 ---
 
@@ -58,24 +55,7 @@ Application (DNS Client)
 
 答案是：**個人電腦裡本來就沒有 Google 的表！但電腦必須預先知道「查號台的純數字 IP」！**
 
-```text
-[你的電腦 / DNS Client]                             [Google DNS: 8.8.8.8]
-        │                                                     │
-        │ 1. 電腦開機時透過 DHCP 取得查號台純數字 IP           │
-        │    (例如 8.8.8.8，完全不需要先查網址)               │
-        │                                                     │
-        │ 2. 打包 UDP 封包送到 8.8.8.8:53                     │
-        │    Payload 詢問: "請問 google.com 是多少？"         │
-        │ ──────────────────────────────────────────────────> │
-        │                                                     │ 3. 8.8.8.8 翻閱全球資料庫
-        │                                                     │    找到: 142.250.204.46
-        │                                                     │
-        │ 4. 8.8.8.8 回傳 UDP 回信                            │
-        │    Payload 告知: "142.250.204.46"                   │
-        │ <────────────────────────────────────────────────── │
-        ▼
-   拿到 IP！填入 IPv4 Header 開始上網！
-```
+![Day15 Mini DNS Client 查詢流程圖](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day15/Day15_1.png)
 
 ---
 
@@ -172,8 +152,10 @@ buf                qname_ptr                       qtrailer_ptr
 ### 7. 隨機 Transaction ID 的資安意義
 
 * **教學寫死 `0x1234`**：便於 Wireshark 抓包除錯。
-* **工業級實作隨機 ID（`rand() & 0xFFFF`）**：
-  防範 **DNS 快取毒害（DNS Cache Poisoning / Kaminsky 攻擊）**。若 ID 固定或有規律，駭客可在真實 DNS 回覆前搶先發送偽造的回應封包（例如將銀行網址導向釣魚 IP）。隨機 16-bit ID 結合隨機 Client UDP Port 使攻擊者幾乎無法猜中！
+* **教學版隨機 ID（`rand() & 0xFFFF`）**：
+  至少可以避免每次查詢都使用固定 ID，讓 Client 能用 Transaction ID 對應「這包回覆屬於哪一筆查詢」。
+
+不過要特別注意：`rand()` **不是密碼學安全亂數**，不能稱為真正的工業級 DNS 防護。真實 DNS Resolver 面對 **DNS 快取毒害（DNS Cache Poisoning / Kaminsky 攻擊）** 時，通常還會搭配高品質亂數、隨機 Client UDP Source Port、查詢名稱隨機化、bailiwick checking，甚至 DNSSEC 等機制。今天的版本重點是理解 Transaction ID 的角色，而不是完成完整資安防護。
 
 ---
 
@@ -197,17 +179,7 @@ Answer Resource Record 記憶體排列：
 * **指標前進的嚴謹性（為什麼 `p += 2; // skip class` 絕不能漏？）**：
   雖然我們只關心 TYPE（是否為 Type A）與 IP 資料，但 `CLASS` 欄位實實在在佔用了封包中的 2 個 bytes。若少跳 2 個 bytes，後面的 `TTL`、`RDLENGTH` 與 `RDATA`（真實 IP）記憶體位移將全面錯位，讀出的 IP 將淪為亂碼！
 
----
-
-### 9. 現象觀察：為什麼 `google.com` 回覆 6 組 IP？
-
-當我們執行 `./dns_client google.com` 時，Server 回傳了 6 組 IP：
-1. **負載平衡（DNS Round-Robin / Load Balancing）**：
-   Google 每秒承受數千萬次造訪，無法依賴單一主機。DNS 伺服器回傳一整組伺服器叢集（Cluster）IP，由客戶端分散連線。
-2. **高可用性（High Availability / Failover）**：
-   若第一組 IP 發生斷線或維護，客戶端可無縫自動切換至第二組 IP 繼續連線。
-3. **程式碼健壯性證明**：
-   我們的解析迴圈 `for (int i = 0; i < ancount; i++)` 搭配 `p += rdlength;` 精準遍歷了全部 6 筆記錄，封包長度暴增至 124 bytes 依然穩定拆解無誤！
+> **教學版簡化提醒**：本文程式碼為了聚焦 DNS 格式，部分欄位讀取採用直接指標轉型，例如 `*(uint16_t *)p`。更嚴謹的 parser 應使用 `memcpy` 讀取多位元組欄位，避免未對齊存取問題，並在每次 `p` 前進與讀取 `RDLENGTH` 後確認 `p + rdlength <= buffer + len`，避免 malformed packet 造成越界讀取。
 
 ---
 
@@ -552,6 +524,18 @@ $$\text{總長度} = 12 \text{ (Header)} + 12 \text{ (QNAME)} + 4 \text{ (Traile
 | **Answer RRs (共 6 筆)** | 6 筆 IPv4 A 記錄 | **96** ($16 \times 6$) | **124** | 每一筆 A 記錄佔 16 Bytes：<br>• Name 指標 `0xc00c` (2B)<br>• Type=1 (2B)<br>• Class=1 (2B)<br>• TTL (4B)<br>• RDLength=4 (2B)<br>• RDATA IPv4 (4B) |
 
 $$\text{總長度} = 12 \text{ (Header)} + 16 \text{ (Question)} + (16 \times 6) \text{ (6 筆 Answer)} = 124 \text{ Bytes (100\% 吻合)}$$
+
+---
+
+### 現象觀察：為什麼 `google.com` 回覆 6 組 IP？
+
+從實測輸出可以看到：`ANCOUNT = 6`，代表這次 DNS 回覆包含 6 筆 Answer RR，也就是 6 組 IPv4 位址。
+
+這通常是因為大型服務會透過 DNS 回傳多個 A Record：
+
+1. **負載平衡（DNS Round-Robin / Load Balancing）**：讓不同 Client 分散連到不同伺服器。
+2. **高可用性（High Availability / Failover）**：某台伺服器不可用時，Client 還有其他 IP 可以嘗試。
+3. **解析器驗收**：我們的 `dns_parse_response()` 能依照 `ANCOUNT` 逐筆前進，成功解析多筆 Answer，而不是只處理第一筆。
 
 ---
 
