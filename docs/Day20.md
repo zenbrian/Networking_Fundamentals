@@ -25,21 +25,13 @@ Client                                             Server
 
 # 今日學習目標與成果
 
-- [x] **解析 TCP Data Offset 動態標頭長度**：
-  - 理解為什麼 TCP 標頭長度不固定（Options 選項的存在，如 MSS、Window Scale、SACK 等）。
-  - 掌握高 4 位元提取與乘 4 換算（`tcp_hdr_len = (tcp->data_offset >> 4) * 4`）。
-- [x] **計算 Payload 起始指標與長度**：
-  - 指標偏移：`payload = (uint8_t *)tcp + tcp_hdr_len`。
-  - 長度計算：`payload_len = ntohs(ip->total_length) - ip_hdr_len - tcp_hdr_len`。
-- [x] **實作 Payload 輸出器 `tcp_dump_payload()`**：
-  - 使用安全二進位輸出函式 `fwrite`，避免因缺少 `\0` 造成記憶體越界。
-- [x] **理解 ESTABLISHED 狀態下的 ACK 旗標特性**：
-  - 深入探討全雙工通訊中的「搭便車原則（Piggybacking）」：連線建立後，幾乎所有封包都帶著 ACK。
-- [x] **實作純 ACK 發送器 `tcp_send_ack()`**：
-  - 封裝無 Payload 的純 ACK 標頭（Flags = `TCP_ACK`）。
-  - 依據收到的位元組數推進確認序號：`conn->ack = received_seq + payload_len`。
-- [x] **撰寫自動化端到端資料傳輸測試程式 (`test/send_tcp_data.c`)**：
-  - 自動完成交握 $\rightarrow$ 發送 HTTP GET 請求 $\rightarrow$ 等待並驗證 Server 回傳的累積確認 ACK。
+- [x] 使用 Data Offset 找到 TCP Payload 起點。
+- [x] 用 IPv4 `total_length` 計算 Payload 長度。
+- [x] 使用 `fwrite()` 安全印出 Payload。
+- [x] 在 `TCP_ESTABLISHED` 狀態處理帶資料的 TCP 封包。
+- [x] 根據收到的資料長度更新 `conn->ack`。
+- [x] 回傳純 ACK，確認已收到 Client 的資料。
+- [x] 使用 `send_tcp_data` 驗證 HTTP GET 請求與 ACK 回覆。
 
 ---
 
@@ -77,6 +69,8 @@ Client                                             Server
    - 數值 `5`：$5 \times 4 = 20\text{ Bytes}$（無 Options）
    - 數值 `8`：$8 \times 4 = 32\text{ Bytes}$（包含 12 Bytes Options）
 
+![Day20 TCP Payload 長度計算架構圖](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day20/Day20_1.png)
+
 ---
 
 ### 3. ACK Number 的計算規則（Cumulative ACK 累積確認）
@@ -91,6 +85,8 @@ TCP 是位元組流（Byte Stream）協定，序號代表的是「第幾個 Byte
 - 伺服器回覆的確認號碼公式：
   $$\text{Next ACK} = \text{received\_seq} + \text{payload\_len} = 1001 + 34 = \mathbf{1035}$$
 - 這代表伺服器向客戶端宣告：**「1034 以前的位元組我全部收妥，請你下次從 1035 開始送！」**
+
+![Day20 TCP 累積確認 ACK 計算流程圖](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day20/Day20_2.png)
 
 ---
 
@@ -251,11 +247,10 @@ Host: 10.0.0.2
 
 ### Day 21 預告：
 今天我們是**被動接收資料並確認**。明天（Day 21），我們將實作 **TCP Send（主動傳送資料）**！
-當收到客戶端的 `GET / HTTP/1.1` 時，伺服器將親自封裝並主動回傳：
-```text
-HTTP/1.1 200 OK
-Content-Length: 13
 
-Hello, World!
+當收到客戶端的 `GET / HTTP/1.1` 時，伺服器會先回傳一段簡單文字：
+```text
+Hello from My TCP Stack
 ```
-讓客戶端第一次收到我們自製 TCP Stack 吐出的網頁內容！
+
+Day21 的重點是先確認 TCP Stack 具備主動送出 Payload 的能力；真正的 HTTP Response 格式會留到後續再逐步補上。

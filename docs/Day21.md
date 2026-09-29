@@ -17,7 +17,7 @@ Client                                             Server
   │ 3. ACK 回條 (SEQ=5001, ACK=1035)                 │
   │<─────────────────────────────────────────────────┤  (純 ACK：確認收到請求)
   │                                                  │
-  │ 4. HTTP / 文字回應 (SEQ=5001, ACK=1035)          │
+  │ 4. TCP Payload Response (SEQ=5001, ACK=1035)     │
   │    "Hello from My TCP Stack\n" (24 Bytes)        │
   │<─────────────────────────────────────────────────┤  【tcp_send()】主動送出 Payload！
   │                                                  │  (Server SEQ 推進：5001 + 24 = 5025)
@@ -28,26 +28,13 @@ Client                                             Server
 
 # 今日學習目標與成果
 
-- [x] **區分控制封包（Control Segment）與資料封包（Data Segment）**：
-  - 理解 `tcp_send_syn_ack()` / `tcp_send_ack()`（純標頭控制封包）與 `tcp_send()`（動態資料封包）在緩衝區長度與序號管理上的根本差異。
-- [x] **實作通用資料發送引擎 `tcp_send()`**：
-  - 動態配置 Buffer：`ETH_HEADER_LEN + sizeof(ipv4) + sizeof(tcp) + len`。
-  - 將應用層資料 `memcpy` 到 TCP 標頭後方的 Payload 區域。
-  - 動態計算 IPv4 `total_length` 並重新計算 Checksum。
-- [x] **掌握 TCP 旗標 `TCP_PSH` 的核心用途**：
-  - 了解作業系統預設的緩衝機制（Buffering）。
-  - 理解 `TCP_PSH`（Push）如何通知接收端「立即推給應用層，不要在緩衝區等待湊齊滿包」。
-- [x] **掌握 Sequence Number 序號的推進（進程管理）**：
-  - 純 ACK 封包不消耗序號，但資料封包**每送出 1 Byte 就必須消耗 1 號**：`conn->seq += len`。
-  - 確保下一個封包的起點序號正確無誤，維持 TCP 位元組流（Byte Stream）的連續性。
-- [x] **探討「獨立確認（Separate ACK）」與「捎帶確認（Piggybacking）」**：
-  - 剖析為什麼在連線建立後，發送資料時封包自帶 ACK 旗標。
-  - 探討 Linux 核心的 Delayed ACK（延遲確認）機制在效能與延遲上的權衡。
-- [x] **深入解析 Passive Learning（被動學習）與 ARP 表查詢**：
-  - 解答為何在發送 TCP 封包時如果查不到 ARP 表項可以直接報錯（因為握手階段已經被動記錄了對方的 MAC）。
-- [x] **端對端測試驗收**：
-  - 擴充 `test/send_tcp_data.c` 接收並印出 Server 回傳的 `"Hello from My TCP Stack\n"`。
-  - 驗證連續連線下的序號累加（5001 $\rightarrow$ 5025 $\rightarrow$ 5049）。
+- [x] 區分純 ACK 封包與帶 Payload 的資料封包。
+- [x] 實作 `tcp_send()`，封裝 TCP Payload。
+- [x] 動態計算封包長度與 IPv4 `total_length`。
+- [x] 使用 `TCP_ACK | TCP_PSH` 送出資料。
+- [x] 傳送資料後推進 `conn->seq += len`。
+- [x] 收到 HTTP GET 後主動回傳 `Hello from My TCP Stack\n`。
+- [x] 驗證 Client 成功收到 Server 主動送出的資料。
 
 ---
 
@@ -84,6 +71,8 @@ uint8_t buffer[total_len];
 eth               ip                tcp              payload
 ```
 
+![Day21 tcp_send Buffer Layout 與 Payload 封裝圖](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day21/Day21_1.png)
+
 * **`data`**：應用程式想傳送的字串或資料（來源記憶體）。
 * **`payload`**：封包紙帶中 TCP 標頭後方的起始指標（目的記憶體）。
 * **`memcpy(payload, data, len)`**：將貨物裝箱打包進封包中。
@@ -95,10 +84,9 @@ eth               ip                tcp              payload
 
 ### 3. TCP_PSH 旗標的意義
 
-TCP 預設會為了網路吞吐量而快取資料（例如 Nagle 演算法）。
-當我們加上 `TCP_PSH`（Push）旗標時：
-* 通知接收端作業系統：**「這是一段完整的應用層訊息，請立刻推（Push）給應用程式處理，不要在緩衝區慢慢等待湊齊 MSS！」**
-* 在 Wireshark 側錄中，凡是傳送 HTTP Request/Response、終端機命令等即時封包，幾乎都會標記為 `[PSH, ACK]`。
+TCP 可能會為了吞吐量與效率而暫存資料。`TCP_PSH`（Push）不是「應用層訊息邊界」的保證，而是一個提示：希望接收端不要為了等待更多資料而延遲，能儘快把目前已收到的資料交給應用程式。
+
+在 Wireshark 側錄中，許多 HTTP Request/Response、終端機命令等即時互動封包，常會看到 `[PSH, ACK]`。
 
 ---
 
@@ -111,7 +99,7 @@ TCP 預設會為了網路吞吐量而快取資料（例如 Nagle 演算法）。
 * **捎帶確認（Piggybacking）**：
   因為 `tcp_send()` 本身就帶有 `TCP_ACK` 旗標與確認號碼 `tcp->ack = htonl(conn->ack)`，若直接送資料封包，就同時完成了「回覆資料」與「確認請求」，節省一個封包。
 
-在真實的 Linux Kernel 中，這透過 **Delayed ACK（延遲確認）** 自動判斷：若應用程式很快回傳就合併（Piggyback），若應用程式慢就先發純 ACK。
+本日教學版為了觀察清楚，採用「先送純 ACK，再送資料」的方式；真實 TCP stack 常會透過 **Delayed ACK（延遲確認）** 判斷是否能合併成 Piggyback：若應用程式很快回傳就合併，若應用程式較慢就先發純 ACK。
 
 ---
 
@@ -259,6 +247,9 @@ Frame length: 88 bytes
 ```
 
 #### 💡 同一條連線內的關鍵觀察（Sequence 累加驗證）：
+
+![Day21 Server SEQ 推進圖](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day21/Day21_2.png)
+
 如果在同一條 `TCP_ESTABLISHED` 連線尚未關閉時，連續呼叫 `tcp_send()` 傳送資料，可以觀察到 Server 端 `conn->seq` 會依照 Payload 長度持續推進：
 ```text
 [TCP] Sent ACK: SEQ=5025, ACK=1035

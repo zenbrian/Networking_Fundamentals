@@ -22,29 +22,21 @@ Client                                  Server
   │                             (TCP 連線正式成功建立！)
 ```
 
+![Day19 ACK 到 ESTABLISHED 狀態轉移流程圖](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day19/Day19_1.png)
+
 這代表我們的 TCP 協定棧不再只是「聽得見」和「說得出」，而是**正式具備了最小化三向交握狀態轉換能力**，這是自製 TCP/IP 協定棧中非常重要的里程碑！
 
 ---
 
 # 今日學習目標與成果
 
-- [x] **實作連線四元組查找器 `tcp_find_connection()`**：
-  - 依據 `{src_ip, dst_ip, src_port, dst_port}` 四元組精確定位特定的連線 Socket。
-  - 理解為什麼不能寫死只查 `TCP_SYN_RECEIVED`，而是必須涵蓋未來所有的連線狀態（如 `ESTABLISHED`、`FIN_WAIT` 等）。
-- [x] **純 ACK 封包辨識與處理**：
-  - 在 `tcp_receive()` 中正確過濾純 ACK 旗標：`(tcp->flags & TCP_ACK) && !(tcp->flags & TCP_SYN)`。
-- [x] **嚴格驗證 ACK Number**：
-  - 伺服器先前送出的 ISN 為 `5000`，因 SYN 佔用 1 個序號空間，客戶端回傳的 ACK 必須恰好為 `expected_ack = conn->seq + 1`（即 `5001`）。
-- [x] **完成狀態機轉換與序號推進**：
-  - 將狀態切換為 `conn->state = TCP_ESTABLISHED`。
-  - 執行 `conn->seq++`，將伺服器序列號推進至 `5001`，為後續資料傳輸鋪路。
-- [x] **實作 `tcp_accept()` 雛形**：
-  - 為應用層（如未來的 HTTP Server）提供取得已就緒連線的介面。
-  - 目前版本只是回傳第一個 `TCP_ESTABLISHED` 連線，尚未實作真實 OS 中的 accept queue、blocking wakeup 與 backlog 管理。
-- [x] **撰寫三向交握自動測試程式 (`test/send_tcp_handshake.c`)**：
-  - 模擬客戶端自動依序完成：發送 SYN $\rightarrow$ 等待接收 SYN-ACK $\rightarrow$ 發送最終 ACK。
-- [x] **實機全鏈路驗收成功**：
-  - Socket Table 成功由 `SYN_RECEIVED` 躍升為 `ESTABLISHED`！
+- [x] 實作 `tcp_find_connection()`，用 4-Tuple 找到既有連線。
+- [x] 辨識三向交握最後一包純 ACK。
+- [x] 驗證 Client ACK 是否等於 `server_seq + 1`。
+- [x] 將連線狀態從 `TCP_SYN_RECEIVED` 轉為 `TCP_ESTABLISHED`。
+- [x] 推進 Server SEQ，為後續資料傳輸做準備。
+- [x] 實作 `tcp_accept()` 雛形，取得已建立連線。
+- [x] 使用 `send_tcp_handshake` 完成自動化三向交握測試。
 
 ---
 
@@ -82,7 +74,7 @@ $$\text{\{ 來源 IP, 目的 IP, 來源 Port, 目的 Port \}}$$
 
 ---
 
-### 3. 為什麼一定要「三次」交握？不能兩次嗎？
+### 3. 為什麼不能只交握兩次？
 
 如果只有兩次交握（Client 發 SYN，Server 回 SYN-ACK 即建立）：
 - **假想情境**：Client 發送的第一個 SYN 在網路節點中塞車延遲了，Client 超時後重新發了第二個 SYN 並完成通訊後斷線。
