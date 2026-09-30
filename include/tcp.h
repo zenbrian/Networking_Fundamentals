@@ -41,7 +41,13 @@ enum tcp_state
     TCP_LISTEN,
     TCP_SYN_SENT,
     TCP_SYN_RECEIVED,
-    TCP_ESTABLISHED
+    TCP_ESTABLISHED,
+    /* 關閉流程新增狀態 */
+    TCP_FIN_WAIT_1,
+    TCP_FIN_WAIT_2,
+    TCP_CLOSE_WAIT,
+    TCP_LAST_ACK,
+    TCP_TIME_WAIT,
 };
 
 /* TCP 亂序封包暫存結構 */
@@ -84,6 +90,8 @@ struct tcp_socket
     struct tcp_segment send_buffer[64];
     uint32_t last_ack;         // 記錄上次收到的 ACK 號碼
     int dup_ack_count;         // 重複 ACK 的累計次數
+    /* ★ TIME_WAIT 計時器 */
+    uint64_t time_wait_start;  // 進入 TIME_WAIT 的時間戳記 (毫秒) 
 };
 
 /* 印出 TCP 標頭資訊 */
@@ -104,6 +112,12 @@ int tcp_send_ack(int fd, struct tcp_socket *conn);
 int tcp_send(int fd, struct tcp_socket *conn, const uint8_t *data, size_t len);
 void tcp_send_data(int fd, struct tcp_socket *conn);
 void tcp_check_retransmission(int fd);
+int tcp_send_fin(int fd, struct tcp_socket *conn);
+/*  Day 24 主動關閉與 TIME_WAIT 函式 */
+int tcp_close(int fd, struct tcp_socket *conn);
+void tcp_check_time_wait(void);
+
+
 
 
 #endif /* TCP_H */

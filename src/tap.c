@@ -110,6 +110,7 @@ int main()
         struct timeval tv = { .tv_sec = 0, .tv_usec = 100000 }; // 100ms
         int sel = select(fd + 1, &fds, NULL, NULL, &tv);
         // 每隔 100ms 或每次有封包進出時，檢查一次超時重傳
+        tcp_check_time_wait();
         tcp_check_retransmission(fd);
         if (sel <= 0) {
             continue; // 超時或被信號中斷，回到迴圈頂端繼續計時

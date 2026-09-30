@@ -114,6 +114,11 @@ void tcp_dump_table(void)
             case TCP_SYN_SENT:     printf("SYN_SENT     "); break;
             case TCP_SYN_RECEIVED: printf("SYN_RECEIVED "); break;
             case TCP_ESTABLISHED:  printf("ESTABLISHED  "); break;
+            case TCP_FIN_WAIT_1:   printf("FIN_WAIT_1   "); break;
+            case TCP_FIN_WAIT_2:   printf("FIN_WAIT_2   "); break;
+            case TCP_CLOSE_WAIT:   printf("CLOSE_WAIT   "); break;
+            case TCP_LAST_ACK:     printf("LAST_ACK     "); break;
+            case TCP_TIME_WAIT:    printf("TIME_WAIT    "); break;
             default:               printf("UNKNOWN      "); break;
         }
         if (tcp_table[i].state == TCP_LISTEN) {
@@ -416,6 +421,24 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
         if (conn->state == TCP_ESTABLISHED) {
             uint32_t ack_num = ntohl(tcp->ack);
             tcp_process_ack(fd, conn, ack_num);
+
+             if (tcp->flags & TCP_FIN) {
+                uint32_t received_seq = ntohl(tcp->seq);
+                printf("\n========================================\n");
+                printf("[TCP] FIN Received from Client! (SEQ=%u)\n", received_seq);
+                // FIN 消耗 1 個序號 (如果有夾帶 payload 也要一起算進去)
+                conn->ack = received_seq + payload_len + 1;
+                // 第二次揮手：Server 回覆 ACK，進入 CLOSE_WAIT
+                printf("[TCP] Sending ACK for FIN -> State: CLOSE_WAIT\n");
+                conn->state = TCP_CLOSE_WAIT;
+                tcp_send_ack(fd, conn);
+                // 第三次揮手：Server 也發送自己的 FIN，進入 LAST_ACK
+                printf("[TCP] Server closing -> Sending FIN -> State: LAST_ACK\n");
+                conn->state = TCP_LAST_ACK;
+                tcp_send_fin(fd, conn);
+                printf("========================================\n\n");
+                return;
+            }
             if (payload_len > 0) {
                 uint32_t received_seq = ntohl(tcp->seq);
                 printf("\n[TCP] Received Payload: SEQ=%u, Len=%zu (Expected SEQ=%u)\n",
@@ -435,6 +458,18 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
                     // ★ 收到正常依序的請求，回送回應資料（存入 send_buffer 供後續測試重傳）
                     tcp_send_data(fd, conn);
 
+                    // ★ 若 Client 請求中包含 "CLOSE" 關鍵字，觸發 Server 主動關閉
+                    int trigger_close = 0;
+                    for (size_t k = 0; k + 5 <= payload_len; k++) {
+                        if (memcmp(payload + k, "CLOSE", 5) == 0) {
+                            trigger_close = 1;
+                            break;
+                        }
+                    }
+                    if (trigger_close) {
+                        tcp_close(fd, conn);
+                    }
+
                 } else if (received_seq > conn->expected_seq) {
                     // 情況二：亂序封包 (Out-of-Order / Future Packet)
                     printf("[TCP Reassembly] Out-of-Order Packet detected! (Missing bytes before SEQ %u)\n", received_seq);
@@ -452,7 +487,59 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
             }
             return;
         }
-
+        // ★ 2. 第四次揮手：收到 Client 回傳的最終 ACK
+        if (conn->state == TCP_LAST_ACK) {
+            if (tcp->flags & TCP_ACK) {
+                conn->state = TCP_CLOSED;
+                printf("\n========================================\n");
+                printf("[TCP] Final ACK Received!\n");
+                printf("[TCP] Four-Way Teardown Complete: State -> CLOSED\n");
+                printf("========================================\n\n");
+                tcp_dump_table();
+                return;
+            }
+            // ★ 主動關閉路徑 1：Server 處於 FIN_WAIT_1，等待對方確認我方 FIN 的 ACK
+           
+        }
+        if (conn->state == TCP_FIN_WAIT_1) {
+            if (tcp->flags & TCP_ACK) {
+                uint32_t ack_num = ntohl(tcp->ack);
+                if (ack_num == conn->seq) {
+                    conn->state = TCP_FIN_WAIT_2;
+                    printf("\n========================================\n");
+                    printf("[TCP Active Close] ACK for our FIN received! (ACK=%u)\n", ack_num);
+                    printf("[TCP Active Close] State -> FIN_WAIT_2 (Waiting for peer FIN)\n");
+                    printf("========================================\n\n");
+                    tcp_dump_table();
+                    return;
+                }
+            }
+        }
+        // ★ 主動關閉路徑 2：Server 處於 FIN_WAIT_2，等待對方的 FIN
+        if (conn->state == TCP_FIN_WAIT_2) {
+            if (tcp->flags & TCP_FIN) {
+                uint32_t received_seq = ntohl(tcp->seq);
+                printf("\n========================================\n");
+                printf("[TCP Active Close] Peer FIN received! (SEQ=%u)\n", received_seq);
+                conn->ack = received_seq + payload_len + 1;
+                printf("[TCP Active Close] Sending Final ACK -> State: TIME_WAIT\n");
+                tcp_send_ack(fd, conn);
+                conn->state = TCP_TIME_WAIT;
+                conn->time_wait_start = get_current_time_ms();
+                printf("[TCP Active Close] State -> TIME_WAIT (2-second timer started)\n");
+                printf("========================================\n\n");
+                tcp_dump_table();
+                return;
+            }
+        }
+        // ★ 主動關閉路徑 3：TIME_WAIT 留守期間若對方重送 FIN，再度補發 ACK
+        if (conn->state == TCP_TIME_WAIT) {
+            if (tcp->flags & TCP_FIN) {
+                printf("[TCP TIME_WAIT] Retransmitted Peer FIN received -> Resending Final ACK\n");
+                tcp_send_ack(fd, conn);
+                return;
+            }
+        }
 
     }
 }
@@ -565,6 +652,65 @@ int tcp_send_ack(int fd, struct tcp_socket *conn)
 
     return 0;
 }
+
+int tcp_send_fin(int fd, struct tcp_socket *conn)
+{
+    // 1. 準備 Buffer 與指標 (無 Payload，總長度 54 Bytes)
+    uint8_t buffer[ETH_HEADER_LEN + sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr)];
+    memset(buffer, 0, sizeof(buffer));
+
+    struct ethernet_hdr *eth = (struct ethernet_hdr *)buffer;
+    struct ipv4_hdr *ip = (struct ipv4_hdr *)(buffer + ETH_HEADER_LEN);
+    struct tcp_hdr *tcp = (struct tcp_hdr *)(buffer + ETH_HEADER_LEN + sizeof(struct ipv4_hdr));
+
+    // 2. 封裝 TCP Header
+    tcp->src_port = htons(conn->dst_port);
+    tcp->dst_port = htons(conn->src_port);
+    tcp->seq = htonl(conn->seq);
+    tcp->ack = htonl(conn->ack);
+    tcp->data_offset = (5 << 4);
+    tcp->window = htons(4096);
+    tcp->flags = TCP_FIN | TCP_ACK; // ★ 關鍵：帶上 FIN 與 ACK
+    tcp->checksum = 0;
+    tcp->urgent_ptr = 0;
+
+    // 3. 封裝 IPv4 Header
+    ip->version_ihl = (4 << 4) | 5;
+    ip->tos = 0;
+    ip->total_length = htons(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr));
+    ip->identification = htons(2005);
+    ip->flags_fragment = 0;
+    ip->ttl = 64;
+    ip->protocol = IPPROTO_TCP;
+    ip->src_ip = conn->dst_ip;
+    ip->dst_ip = conn->src_ip;
+    ip->checksum = 0;
+    ip->checksum = ipv4_checksum(ip, sizeof(struct ipv4_hdr));
+
+    // 4. 封裝 Ethernet Header (查詢 ARP Table)
+    struct arp_entry *entry = arp_table_lookup((const uint8_t *)&conn->src_ip);
+    if (!entry || !entry->valid) {
+        printf("[TCP] Send FIN failed: MAC not in ARP table\n");
+        return -1;
+    }
+    memcpy(eth->dst, entry->mac, ETH_ADDR_LEN);
+    memcpy(eth->src, LOCAL_MAC, ETH_ADDR_LEN);
+    eth->ethertype = htons(ETHERTYPE_IPV4);
+
+    // 5. 寫出到 TAP 虛擬網卡
+    ssize_t sent = write(fd, buffer, sizeof(buffer));
+    if (sent < 0) {
+        perror("[TCP] write FIN failed");
+        return -1;
+    }
+
+    //  關鍵：FIN 消耗 1 個序號！
+    conn->seq++;
+    printf("[TCP] Sent FIN-ACK: SEQ=%u, ACK=%u (seq advanced to %u)\n", 
+           ntohl(tcp->seq), conn->ack, conn->seq);
+    return 0;
+}
+
 
 int tcp_send(int fd, struct tcp_socket *conn, const uint8_t *data, size_t len){
     // 1. 計算總長度：L2 (14) + L3 (20) + L4 (20) + 應用層資料長度 (len)
@@ -681,4 +827,41 @@ void tcp_check_retransmission(int fd)
         }
     }
 }
+
+
+/* ★ Day 24 主動關閉入口：對 ESTABLISHED 連線發送 FIN 並轉為 FIN_WAIT_1 */
+int tcp_close(int fd, struct tcp_socket *conn)
+{
+    if (!conn || conn->state != TCP_ESTABLISHED) {
+        printf("[TCP Active Close] Error: Connection not ESTABLISHED (cannot close)\n");
+        return -1;
+    }
+
+    printf("\n[TCP Active Close] ★ Initiating Active Close: Sending FIN...\n");
+    if (tcp_send_fin(fd, conn) < 0) {
+        return -1;
+    }
+
+    conn->state = TCP_FIN_WAIT_1;
+    printf("[TCP Active Close] State -> FIN_WAIT_1 (Waiting for peer ACK)\n");
+    tcp_dump_table();
+    return 0;
+}
+
+#define TCP_TIME_WAIT_MS 2000
+void tcp_check_time_wait(void)
+{
+    uint64_t now = get_current_time_ms();
+    for (int i = 0; i < MAX_TCP_SOCKETS; i++) {
+        if (tcp_table[i].state == TCP_TIME_WAIT) {
+            if (now - tcp_table[i].time_wait_start >= TCP_TIME_WAIT_MS) {
+                printf("\n[TCP TIME_WAIT] ★ 2-second Timer Expired -> State: CLOSED (Socket [%02d] released)\n", i);
+                tcp_table[i].state = TCP_CLOSED;
+                tcp_dump_table();
+            }
+        }
+    }
+}
+
+
 

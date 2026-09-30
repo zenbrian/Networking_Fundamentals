@@ -5,6 +5,8 @@
 
 今天（Day 23），我們在自製的 TCP 協定棧中實作了 TCP 最具代表性的核心可靠傳輸機制：**重傳緩衝區（Send Buffer）**、**重複確認偵測（Duplicate ACK）**、**快速重傳（Fast Retransmit）** 與 **超時重傳計時器（Retransmission Timeout, RTO）**。
 
+![Day23 TCP 封包遺失與重傳判斷流程](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day23/Day23_1.png)
+
 ---
 
 # 今日學習目標與成果
@@ -231,6 +233,8 @@ void tcp_check_retransmission(int fd)
 ---
 
 # 實測驗證與日誌流程
+
+![Day23 send_tcp_retransmit 核心重傳與釋放測試情境](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day23/Day23_2.png)
 
 ### 測試執行方式
 在 WSL 開啟兩個終端機：

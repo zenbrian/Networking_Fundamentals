@@ -103,7 +103,7 @@ My Network Stack
 | [Day 21](docs/Day21.md) | TCP Data Transfer (Part 2) | 主動送出 Payload 完成雙向傳輸 |
 | [Day 22](docs/Day22.md) | TCP Reassembly | 用 Sequence Number 重組資料流 |
 | [Day 23](docs/Day23.md) | TCP Retransmission | 實作 Timeout 與 Retransmit |
-| Day 24 | FIN | 實作 Connection Close |
+| [Day 24](docs/Day24.md) | FIN | 實作 Connection Close |
 | Day 25 | Socket API | 封裝 `bind()`、`listen()`、`accept()`、`recv()`、`send()` |
 
 ### Phase 5：HTTP（Day 26 ~ Day 30）
@@ -137,6 +137,7 @@ My Network Stack
 - [x] Day 21：TCP Data Transfer (Part 2)
 - [x] Day 22：TCP Reassembly
 - [x] Day 23：TCP Retransmission
+- [x] Day 24：TCP Connection Close (Four-Way Teardown)
 
 ---
 
