@@ -99,9 +99,9 @@ My Network Stack
 | [Day 17](docs/Day17.md) | TCP State Machine | 建立 LISTEN、SYN_RECEIVED、ESTABLISHED 狀態 |
 | [Day 18](docs/Day18.md) | TCP Three-Way Handshake (Part 1) | 收到 SYN，回覆 SYN-ACK |
 | [Day 19](docs/Day19.md) | TCP Three-Way Handshake (Part 2) | 收到 ACK，進入 ESTABLISHED |
-| Day 20 | TCP Data Transfer | 接收 TCP Payload 資料與回覆 ACK |
-| Day 21 | TCP Payload | 接收 TCP Data |
-| Day 22 | Sequence Number | 管理 SEQ 與 ACK |
+| [Day 20](docs/Day20.md) | TCP Data Transfer (Part 1) | 接收 TCP Payload 資料與回覆 ACK |
+| [Day 21](docs/Day21.md) | TCP Data Transfer (Part 2) | 主動送出 Payload 完成雙向傳輸 |
+| [Day 22](docs/Day22.md) | TCP Reassembly | 用 Sequence Number 重組資料流 |
 | Day 23 | TCP Retransmission | 實作 Timeout 與 Retransmit |
 | Day 24 | FIN | 實作 Connection Close |
 | Day 25 | Socket API | 封裝 `bind()`、`listen()`、`accept()`、`recv()`、`send()` |
@@ -133,6 +133,9 @@ My Network Stack
 - [x] Day 07：IPv4 Checksum
 - [x] Day 08：ICMP Header
 - [x] Day 09：Ping Reply
+- [x] Day 20：TCP Data Transfer (Part 1)
+- [x] Day 21：TCP Data Transfer (Part 2)
+- [x] Day 22：TCP Reassembly
 
 ---
 

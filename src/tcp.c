@@ -2,6 +2,7 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include "ethernet.h"
 #include "ipv4.h"
@@ -19,6 +20,9 @@ void tcp_init(void)
 {
     for (int i = 0; i < MAX_TCP_SOCKETS; i++) {
         tcp_table[i].state = TCP_CLOSED;
+        tcp_table[i].expected_seq = 0;
+        tcp_table[i].fragment_count = 0;
+        memset(tcp_table[i].fragments, 0, sizeof(tcp_table[i].fragments));
     }
 }
 
@@ -159,7 +163,54 @@ void tcp_dump_payload(const uint8_t *data, size_t len)
     printf("\n");
     fflush(stdout);
 }
-
+/* 儲存亂序 (未來) 封包至 Buffer */
+static void store_fragment(struct tcp_socket *conn, uint32_t seq, const uint8_t *data, uint16_t len)
+{
+    // 檢查是否重複存過
+    for (int i = 0; i < 32; i++) {
+        if (conn->fragments[i].used && conn->fragments[i].seq == seq) {
+            printf("[TCP Buffer] Fragment SEQ=%u already buffered, ignore\n", seq);
+            return;
+        }
+    }
+    // 尋找空位存入
+    for (int i = 0; i < 32; i++) {
+        if (!conn->fragments[i].used) {
+            conn->fragments[i].seq = seq;
+            conn->fragments[i].len = len;
+            memcpy(conn->fragments[i].data, data, len);
+            conn->fragments[i].used = 1;
+            conn->fragment_count++;
+            printf("[TCP Buffer] Stored Out-of-Order Fragment: SEQ=%u, Len=%u (Total Buffered: %d)\n",
+                   seq, len, conn->fragment_count);
+            return;
+        }
+    }
+    printf("[TCP Buffer] Fragment buffer full! Dropping SEQ=%u\n", seq);
+}
+/* 檢查並重組 Buffer 中的連續封包 */
+static void process_buffered_fragments(struct tcp_socket *conn)
+{
+    int found = 1;
+    while (found) {
+        found = 0;
+        for (int i = 0; i < 32; i++) {
+            if (conn->fragments[i].used && conn->fragments[i].seq == conn->expected_seq) {
+                printf("\n[TCP Reassembly] Found matching buffered fragment! SEQ=%u, Len=%u\n",
+                       conn->fragments[i].seq, conn->fragments[i].len);
+                
+                // 交付給應用程式印出
+                tcp_dump_payload(conn->fragments[i].data, conn->fragments[i].len);
+                // 更新 expected_seq 與標記位子空出
+                conn->expected_seq += conn->fragments[i].len;
+                conn->fragments[i].used = 0;
+                conn->fragment_count--;
+                found = 1; // 繼續迴圈檢查是否有「連續」的下一個封包
+                break;
+            }
+        }
+    }
+}
 
 void tcp_receive(int fd, const uint8_t *buffer, size_t len)
 {
@@ -205,7 +256,10 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
         }
         uint32_t client_seq = ntohl(tcp->seq); // 取出對方的 SEQ (轉成 host byte order)
         conn->ack = client_seq + 1;            // 我們期待對方的下一號 (1001)
+        conn->expected_seq = client_seq + 1;   // 初始化期待的 Sequence Number
         conn->seq = 5000;                      // Server 自己的初始序號 ISN (先固定 5000)
+        conn->fragment_count = 0;
+        memset(conn->fragments, 0, sizeof(conn->fragments));
 
         tcp_dump_table();
 
@@ -245,19 +299,42 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
         }
         if (conn->state == TCP_ESTABLISHED) {
             if (payload_len > 0) {
-                printf("\n[TCP] Received Payload, Length = %zu bytes\n", payload_len);
-                tcp_dump_payload(payload, payload_len);
-                // 更新 ACK 號碼
                 uint32_t received_seq = ntohl(tcp->seq);
-                conn->ack = received_seq + payload_len;
-                // 回傳 ACK 封包
-                tcp_send_ack(fd, conn);
+                printf("\n[TCP] Received Payload: SEQ=%u, Len=%zu (Expected SEQ=%u)\n",
+                       received_seq, payload_len, conn->expected_seq);
 
-                // ★ 在這裡加入你的主動發送！
+                if (received_seq == conn->expected_seq) {
+                    // 情況一：按順序到達 (In-Order)
+                    printf("[TCP Reassembly] Packet In-Order! Delivering to application...\n");
+                    tcp_dump_payload(payload, payload_len);
+
+                    // 1. 推進期待序號
+                    conn->expected_seq += payload_len;
+
+                    // 2. 檢查並處理暫存區裡的亂序封包 (連鎖反應)
+                    process_buffered_fragments(conn);
+
+                } else if (received_seq > conn->expected_seq) {
+                    // 情況二：亂序封包 (Out-of-Order / Future Packet)
+                    printf("[TCP Reassembly] Out-of-Order Packet detected! (Missing bytes before SEQ %u)\n", received_seq);
+                    store_fragment(conn, received_seq, payload, payload_len);
+
+
+                } else {
+                    // 情況三：重複封包 (Duplicate Packet)
+                    printf("[TCP Reassembly] Duplicate Packet (SEQ=%u < Expected=%u) -> Ignore payload\n",
+                           received_seq, conn->expected_seq);
+                }
+
+                // ★ 累積確認 (Cumulative ACK)：總是回覆目前連續接收到的 expected_seq
+                conn->ack = conn->expected_seq;
+                tcp_send_ack(fd, conn);
                 tcp_send_data(fd, conn);
+
             }
             return;
         }
+
 
     }
 }
@@ -439,3 +516,4 @@ void tcp_send_data(int fd, struct tcp_socket *conn)
     const char *msg = "Hello from My TCP Stack\n";
     tcp_send(fd, conn, (const uint8_t *)msg, strlen(msg));
 }
+

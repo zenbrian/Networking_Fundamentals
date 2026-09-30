@@ -44,15 +44,28 @@ enum tcp_state
     TCP_ESTABLISHED
 };
 
+/* TCP 亂序封包暫存結構 */
+struct tcp_fragment
+{
+    uint32_t seq;
+    uint16_t len;
+    uint8_t data[1500];
+    int used; // 0: 空位, 1: 已佔用
+};
+
 struct tcp_socket
 {
     uint32_t src_ip;
     uint32_t dst_ip;
     uint16_t src_port;
     uint16_t dst_port;
-    uint32_t seq;
-    uint32_t ack;
+    uint32_t seq;              // 自己的 Send Sequence Number
+    uint32_t ack;              // (保持紀錄相容)
+    uint32_t expected_seq;     // ★ 我下一個期待收到的 Client Sequence Number
     enum tcp_state state;
+    /* ★ 亂序重組 Buffer */
+    struct tcp_fragment fragments[32];
+    int fragment_count;
 };
 
 /* 印出 TCP 標頭資訊 */
@@ -72,6 +85,5 @@ int tcp_send_syn_ack(int fd, struct tcp_socket *conn);
 int tcp_send_ack(int fd, struct tcp_socket *conn);
 int tcp_send(int fd, struct tcp_socket *conn, const uint8_t *data, size_t len);
 void tcp_send_data(int fd, struct tcp_socket *conn);
-
 
 #endif /* TCP_H */
