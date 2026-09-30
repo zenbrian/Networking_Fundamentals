@@ -94,37 +94,6 @@
 
 ![Day24 TCP 主動關閉與被動關閉狀態機](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day24/Day24_3.png)
 
-```text
-【被動關閉端 Passive Close (通常是 Server)】
-  ESTABLISHED
-      │  收到 Client 的 FIN ──> 回覆 ACK
-      ▼
-  CLOSE_WAIT
-      │  自身資料發送完畢 ──> 送出 FIN
-      ▼
-  LAST_ACK
-      │  收到 Client 最終 ACK
-      ▼
-   CLOSED  (釋放 Socket 槽位)
-
-----------------------------------------------------
-
-【主動關閉端 Active Close (呼叫 tcp_close)】
-  ESTABLISHED
-      │  呼叫 tcp_close() ──> 送出 FIN
-      ▼
-  FIN_WAIT_1
-      │  收到對端確認我方 FIN 的 ACK
-      ▼
-  FIN_WAIT_2
-      │  收到對端的 FIN ──> 回覆最終 ACK
-      ▼
-  TIME_WAIT
-      │  2 秒倒數計時器結束 (或留守期間補發 ACK)
-      ▼
-   CLOSED  (釋放 Socket 槽位)
-```
-
 ---
 
 # 程式碼實作細節
