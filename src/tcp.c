@@ -16,6 +16,15 @@
 
 static struct tcp_socket tcp_table[MAX_TCP_SOCKETS];
 
+/* 輔助函式：取得當前系統時間 (毫秒 ms) */
+static uint64_t get_current_time_ms(void)
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (uint64_t)tv.tv_sec * 1000 + (uint64_t)tv.tv_usec / 1000;
+}
+
+
 void tcp_init(void)
 {
     for (int i = 0; i < MAX_TCP_SOCKETS; i++) {
@@ -23,6 +32,10 @@ void tcp_init(void)
         tcp_table[i].expected_seq = 0;
         tcp_table[i].fragment_count = 0;
         memset(tcp_table[i].fragments, 0, sizeof(tcp_table[i].fragments));
+
+        tcp_table[i].last_ack = 0;
+        tcp_table[i].dup_ack_count = 0;
+        memset(tcp_table[i].send_buffer, 0, sizeof(tcp_table[i].send_buffer));
     }
 }
 
@@ -212,6 +225,105 @@ static void process_buffered_fragments(struct tcp_socket *conn)
     }
 }
 
+/* 重傳單一 Segment (保持原始 SEQ 不變) */
+int tcp_resend_segment(int fd, struct tcp_socket *conn, struct tcp_segment *seg)
+{
+    size_t total_len = ETH_HEADER_LEN + sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr) + seg->len;
+    uint8_t buffer[total_len];
+    memset(buffer, 0, total_len);
+
+    struct ethernet_hdr *eth = (struct ethernet_hdr *)buffer;
+    struct ipv4_hdr *ip = (struct ipv4_hdr *)(buffer + ETH_HEADER_LEN);
+    struct tcp_hdr *tcp = (struct tcp_hdr *)(buffer + ETH_HEADER_LEN + sizeof(struct ipv4_hdr));
+    uint8_t *payload = buffer + ETH_HEADER_LEN + sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr);
+
+    memcpy(payload, seg->data, seg->len);
+
+    // 封裝 TCP Header
+    tcp->src_port = htons(conn->dst_port);
+    tcp->dst_port = htons(conn->src_port);
+    tcp->seq = htonl(seg->seq); // ★ 關鍵：保持原始序號，絕不推進！
+    tcp->ack = htonl(conn->ack);
+    tcp->data_offset = (sizeof(struct tcp_hdr) / 4) << 4;
+    tcp->flags = TCP_ACK | TCP_PSH;
+    tcp->window = htons(4096);
+    tcp->checksum = 0;
+    tcp->urgent_ptr = 0;
+
+    // 封裝 IPv4 Header
+    ip->version_ihl = (4 << 4) | 5;
+    ip->tos = 0;
+    ip->total_length = htons(sizeof(struct ipv4_hdr) + sizeof(struct tcp_hdr) + seg->len);
+    ip->identification = htons(2004);
+    ip->flags_fragment = 0;
+    ip->ttl = 64;
+    ip->protocol = IPPROTO_TCP;
+    ip->src_ip = conn->dst_ip;
+    ip->dst_ip = conn->src_ip;
+    ip->checksum = 0;
+    ip->checksum = ipv4_checksum(ip, sizeof(struct ipv4_hdr));
+
+    // 封裝 Ethernet Header
+    struct arp_entry *entry = arp_table_lookup((const uint8_t *)&conn->src_ip);
+    if (!entry || !entry->valid) {
+        printf("[TCP Retransmit] Send failed: MAC not in ARP table\n");
+        return -1;
+    }
+    memcpy(eth->dst, entry->mac, ETH_ADDR_LEN);
+    memcpy(eth->src, LOCAL_MAC, ETH_ADDR_LEN);
+    eth->ethertype = htons(ETHERTYPE_IPV4);
+
+    ssize_t sent = write(fd, buffer, sizeof(buffer));
+    if (sent < 0) {
+        perror("[TCP Retransmit] write failed");
+        return -1;
+    }
+
+    seg->send_time = get_current_time_ms(); // ★ 重設時間戳記
+    printf("[TCP Retransmit] ★ Resent Segment: SEQ=%u, Len=%u\n", seg->seq, seg->len);
+    return 0;
+}
+
+/* 處理收到的 ACK：釋放已確認緩衝區 / 偵測 Duplicate ACK / 觸發快速重傳 */
+static void tcp_process_ack(int fd, struct tcp_socket *conn, uint32_t ack_num)
+{
+    if (ack_num > conn->last_ack) {
+        // 情況 A：收到新 ACK
+        printf("[TCP ACK] New ACK received: %u (Previous: %u)\n", ack_num, conn->last_ack);
+        conn->last_ack = ack_num;
+        conn->dup_ack_count = 0;
+
+        // 釋放已確認收到的段落
+        for (int i = 0; i < 64; i++) {
+            if (conn->send_buffer[i].used) {
+                if (conn->send_buffer[i].seq + conn->send_buffer[i].len <= ack_num) {
+                    printf("[TCP Send Buffer] Segment SEQ=%u..%u acknowledged -> Free slot [%02d]\n",
+                           conn->send_buffer[i].seq,
+                           conn->send_buffer[i].seq + conn->send_buffer[i].len,
+                           i);
+                    conn->send_buffer[i].acked = 1;
+                    conn->send_buffer[i].used = 0;
+                }
+            }
+        }
+    } else if (ack_num == conn->last_ack && conn->last_ack > 0) {
+        // 情況 B：收到重複的 ACK
+        conn->dup_ack_count++;
+        printf("[TCP ACK] Duplicate ACK detected: %u (Count = %d)\n", ack_num, conn->dup_ack_count);
+
+        // 快速重傳 (Fast Retransmit)
+        if (conn->dup_ack_count == 3) {
+            printf("\n[TCP Fast Retransmit] ★ 3 Duplicate ACKs received! Fast Retransmitting SEQ=%u...\n", ack_num);
+            for (int i = 0; i < 64; i++) {
+                if (conn->send_buffer[i].used && conn->send_buffer[i].seq == ack_num) {
+                    tcp_resend_segment(fd, conn, &conn->send_buffer[i]);
+                    break;
+                }
+            }
+        }
+    }
+}
+
 void tcp_receive(int fd, const uint8_t *buffer, size_t len)
 {
     // 取得 IPv4 標頭以計算實際 IP Header 長度
@@ -258,8 +370,10 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
         conn->ack = client_seq + 1;            // 我們期待對方的下一號 (1001)
         conn->expected_seq = client_seq + 1;   // 初始化期待的 Sequence Number
         conn->seq = 5000;                      // Server 自己的初始序號 ISN (先固定 5000)
-        conn->fragment_count = 0;
-        memset(conn->fragments, 0, sizeof(conn->fragments));
+
+        conn->last_ack = 0;
+        conn->dup_ack_count = 0;
+        memset(conn->send_buffer, 0, sizeof(conn->send_buffer));
 
         tcp_dump_table();
 
@@ -290,6 +404,8 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
             // 4. 握手成功！狀態轉移到 ESTABLISHED
             conn->state = TCP_ESTABLISHED;
             conn->seq++; // 消耗掉 SYN 的序號，自己的 SEQ 正式推進到 5001
+            conn->last_ack = ack_num;
+            conn->dup_ack_count = 0;
             printf("\n========================================\n");
             printf("[TCP] ACK Received! Handshake Complete!\n");
             printf("[TCP] Connection Established: State -> ESTABLISHED\n");
@@ -298,6 +414,8 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
             return;
         }
         if (conn->state == TCP_ESTABLISHED) {
+            uint32_t ack_num = ntohl(tcp->ack);
+            tcp_process_ack(fd, conn, ack_num);
             if (payload_len > 0) {
                 uint32_t received_seq = ntohl(tcp->seq);
                 printf("\n[TCP] Received Payload: SEQ=%u, Len=%zu (Expected SEQ=%u)\n",
@@ -505,6 +623,20 @@ int tcp_send(int fd, struct tcp_socket *conn, const uint8_t *data, size_t len){
         return -1;
     }
     
+    for (int i = 0; i < 64; i++) {
+        if (!conn->send_buffer[i].used) {
+            conn->send_buffer[i].seq = conn->seq;
+            conn->send_buffer[i].len = len;
+            memcpy(conn->send_buffer[i].data, data, len);
+            conn->send_buffer[i].send_time = get_current_time_ms();
+            conn->send_buffer[i].acked = 0;
+            conn->send_buffer[i].used = 1;
+            printf("[TCP Send Buffer] Saved segment in slot [%02d]: SEQ=%u, Len=%zu\n",
+                   i, conn->seq, len);
+            break;
+        }
+    }
+
     conn->seq += len;
     printf("[TCP] Sent Data: %zu bytes | New SEQ=%u, ACK=%u\n", len, conn->seq, conn->ack);
     return 0;
@@ -515,5 +647,38 @@ void tcp_send_data(int fd, struct tcp_socket *conn)
 {
     const char *msg = "Hello from My TCP Stack\n";
     tcp_send(fd, conn, (const uint8_t *)msg, strlen(msg));
+}
+
+/* 超時重傳計時器檢查：掃描所有連線中超過 1000ms 尚未被 ACK 的 Segment */
+/* 超時重傳計時器檢查 */
+void tcp_check_retransmission(int fd)
+{
+    uint64_t now = get_current_time_ms();
+
+    for (int i = 0; i < MAX_TCP_SOCKETS; i++) {
+        if (tcp_table[i].state == TCP_ESTABLISHED) {
+            for (int j = 0; j < 64; j++) {
+                if (tcp_table[i].send_buffer[j].used && !tcp_table[i].send_buffer[j].acked) {
+                    if (now - tcp_table[i].send_buffer[j].send_time >= 1000) {
+                        
+                        // ★ 若重傳超過 5 次，判定對方離線，放棄該封包
+                        if (tcp_table[i].send_buffer[j].retransmit_count >= 5) {
+                            printf("\n[TCP Retransmit] Max retries (5) reached for SEQ=%u. Dropping.\n",
+                                   tcp_table[i].send_buffer[j].seq);
+                            tcp_table[i].send_buffer[j].used = 0;
+                            continue;
+                        }
+
+                        tcp_table[i].send_buffer[j].retransmit_count++;
+                        printf("\n[TCP Timeout Retransmit] ★ Segment SEQ=%u timeout (%llu ms, Retry #%d)! Retransmitting...\n",
+                               tcp_table[i].send_buffer[j].seq,
+                               (unsigned long long)(now - tcp_table[i].send_buffer[j].send_time),
+                               tcp_table[i].send_buffer[j].retransmit_count);
+                        tcp_resend_segment(fd, &tcp_table[i], &tcp_table[i].send_buffer[j]);
+                    }
+                }
+            }
+        }
+    }
 }
 

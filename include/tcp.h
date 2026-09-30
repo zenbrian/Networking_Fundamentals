@@ -53,6 +53,20 @@ struct tcp_fragment
     int used; // 0: 空位, 1: 已佔用
 };
 
+/* TCP 發送備份段落 (重傳緩衝區結構) */
+struct tcp_segment
+{
+    uint32_t seq;       // 該封包發送時的起始 Sequence Number
+    uint16_t len;       // Payload 資料長度
+    uint8_t data[1500]; // Payload 資料內容備份
+    uint64_t send_time; // 發送時間戳記 (毫秒 ms)
+    int acked;          // 0: 未確認, 1: 已確認收到
+    int used;           // 0: 空位, 1: 已佔用
+    int retransmit_count; // 重傳次數
+};
+
+
+
 struct tcp_socket
 {
     uint32_t src_ip;
@@ -66,6 +80,10 @@ struct tcp_socket
     /* ★ 亂序重組 Buffer */
     struct tcp_fragment fragments[32];
     int fragment_count;
+    /* ★ 重傳緩衝區 (發送端 Send Buffer & Retransmission Queue) */
+    struct tcp_segment send_buffer[64];
+    uint32_t last_ack;         // 記錄上次收到的 ACK 號碼
+    int dup_ack_count;         // 重複 ACK 的累計次數
 };
 
 /* 印出 TCP 標頭資訊 */
@@ -85,5 +103,7 @@ int tcp_send_syn_ack(int fd, struct tcp_socket *conn);
 int tcp_send_ack(int fd, struct tcp_socket *conn);
 int tcp_send(int fd, struct tcp_socket *conn, const uint8_t *data, size_t len);
 void tcp_send_data(int fd, struct tcp_socket *conn);
+void tcp_check_retransmission(int fd);
+
 
 #endif /* TCP_H */

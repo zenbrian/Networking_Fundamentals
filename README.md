@@ -136,6 +136,7 @@ My Network Stack
 - [x] Day 20：TCP Data Transfer (Part 1)
 - [x] Day 21：TCP Data Transfer (Part 2)
 - [x] Day 22：TCP Reassembly
+- [x] Day 23：TCP Retransmission
 
 ---
 
