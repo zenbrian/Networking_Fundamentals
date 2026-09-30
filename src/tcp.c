@@ -432,11 +432,13 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
                     // 2. 檢查並處理暫存區裡的亂序封包 (連鎖反應)
                     process_buffered_fragments(conn);
 
+                    // ★ 收到正常依序的請求，回送回應資料（存入 send_buffer 供後續測試重傳）
+                    tcp_send_data(fd, conn);
+
                 } else if (received_seq > conn->expected_seq) {
                     // 情況二：亂序封包 (Out-of-Order / Future Packet)
                     printf("[TCP Reassembly] Out-of-Order Packet detected! (Missing bytes before SEQ %u)\n", received_seq);
                     store_fragment(conn, received_seq, payload, payload_len);
-
 
                 } else {
                     // 情況三：重複封包 (Duplicate Packet)
@@ -447,8 +449,6 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
                 // ★ 累積確認 (Cumulative ACK)：總是回覆目前連續接收到的 expected_seq
                 conn->ack = conn->expected_seq;
                 tcp_send_ack(fd, conn);
-                tcp_send_data(fd, conn);
-
             }
             return;
         }

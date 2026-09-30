@@ -244,7 +244,7 @@ int main(void)
             size_t payload_len = ntohs(rx_ip->total_length) - rx_ip_len - rx_tcp_len;
 
             if (payload_len > 0 && ntohl(rx_tcp->seq) == s_data_seq) {
-                printf("[Step 3] 🎉 成功收到 Server 快速重傳的封包 (SEQ=%u, Len=%zu)！\n",
+                printf("[Step 3] 成功收到 Server 快速重傳的封包 (SEQ=%u, Len=%zu)！\n",
                        ntohl(rx_tcp->seq), payload_len);
                 break;
             }
@@ -272,7 +272,7 @@ int main(void)
             size_t payload_len = ntohs(rx_ip->total_length) - rx_ip_len - rx_tcp_len;
 
             if (payload_len > 0 && ntohl(rx_tcp->seq) == s_data_seq) {
-                printf("[Step 4] 🎉 成功收到 Server 超時重傳的封包 (SEQ=%u, Len=%zu)！\n",
+                printf("[Step 4] 成功收到 Server 超時重傳的封包 (SEQ=%u, Len=%zu)！\n",
                        ntohl(rx_tcp->seq), payload_len);
                 break;
             }
