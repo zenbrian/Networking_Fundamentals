@@ -18,29 +18,19 @@ Client                                  Server
   │    (Day 19 即將完成)                   │
 ```
 
+![Day18 SYN 到 SYN-ACK 處理流程圖](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day18/Day18_1.png)
+
 ---
 
 # 今日學習目標與成果
 
-- [x] **徹底理解 SYN、ACK 與 SYN-ACK 的語義**：
-  - **SYN (Synchronize)**：同步序號，雙方通訊前進行「對錶」，約定起始 Sequence Number。
-  - **ACK (Acknowledgment)**：確認收到對方的訊號或資料。
-  - **SYN-ACK**：一兼二顧！既確認對方的連線請求，同時也告知對方我方的手錶序號（Initial Sequence Number, ISN）。
-- [x] **釐清序號消耗機制（為什麼 ACK 是 Client SEQ + 1）**：
-  - 即使 SYN 封包 Payload 長度為 0，但依照 RFC 793 規定，**SYN 與 FIN 控制旗標各自必須消耗 1 個 Sequence Number**（將其視為一張建立契約）。
-- [x] **破除常見迷思：三向交握是否有帶 Data？**：
-  - 交握過程原則上**不帶任何應用層資料（Length = 0）**。
-  - 核心目的純粹是**確認雙方的雙向收發能力均暢通**，交握完成進入 `ESTABLISHED` 後才開始傳送真實 Data。
-- [x] **實作 `tcp_send_syn_ack()` 封包發射器**：
-  - 由內而外完成 L4 TCP Header $\rightarrow$ L3 IPv4 Header $\rightarrow$ L2 Ethernet Header 封裝。
-  - 正確將來源與目的 IP / Port 反轉（Server $\rightarrow$ Client）。
-  - 設定 Flags 為 `TCP_SYN | TCP_ACK`（`0x12`）。
-  - 本日先聚焦交握封包格式與狀態流程，TCP Checksum 仍暫填 `0`，完整 Pseudo Header Checksum 留待後續補強。
-- [x] **無縫整合 ARP 動態學習機制**：
-  - 收到 SYN 時第一時間將 Client 的 IP 與 MAC 記錄到 `arp_table`（`arp_table_insert`），回覆時直接命中快取。
-- [x] **雙終端機與 tcpdump 全鏈路實測驗收**：
-  - 終端機順利印出 `[TCP] Sent SYN-ACK: SEQ=5000, ACK=1001`。
-  - `tcpdump` 抓包親眼見證：`Flags [S.]`（SYN+ACK）飛越虛擬網卡！
+- [x] 理解 SYN、ACK、SYN-ACK 在三向交握中的角色。
+- [x] 理解為什麼 SYN 會消耗 1 個 Sequence Number。
+- [x] 收到 SYN 後，設定 `conn->ack = client_seq + 1`。
+- [x] 實作 `tcp_send_syn_ack()`，組出 SYN-ACK 封包。
+- [x] 反轉 Ethernet / IPv4 / TCP 的來源與目的欄位。
+- [x] 使用 ARP Table 找到 Client MAC，將 SYN-ACK 寫回 TAP。
+- [x] 透過 `tcpdump` 驗證 `Flags [S.]` 已送出。
 
 ---
 
@@ -54,15 +44,15 @@ Client                                  Server
 ```text
 1. Client 呼叫 (SYN, SEQ=1000)：
    「喂喂喂，Server，你聽得到我說話嗎？我講話的序號從 1000 號開始算。」
-   👉 Server 知道：Client 能發話、Server 能收聽。
+   Server 知道：Client 能發話、Server 能收聽。
 
 2. Server 回覆 (SYN-ACK, SEQ=5000, ACK=1001)：
    「聽得很清楚！你下次從 1001 開始講。那我發話你聽得到嗎？我講話的序號從 5000 號開始算。」
-   👉 Client 收到後知道：Server 能發話、Client 能收聽！而且剛才自己的話 Server 有收到！
+   Client 收到後知道：Server 能發話、Client 能收聽！而且剛才自己的話 Server 有收到！
 
 3. Client 最後確認 (ACK, ACK=5001)：
    「我也聽得很清楚！你下次從 5001 開始講。」
-   👉 Server 收到後知道：原來 Client 也能順利聽到我剛剛說的話！
+   Server 收到後知道：原來 Client 也能順利聽到我剛剛說的話！
 ```
 
 經過這三步：

@@ -1,0 +1,73 @@
+Create a clean educational networking diagram for a tutorial article about TCP Data Transfer.
+
+Diagram subject:
+How the server advances its TCP Sequence Number after sending a payload.
+
+Canvas:
+16:9 landscape, crisp vector-style technical diagram, white or very light background, modern flat colors, no photorealism.
+
+Main idea:
+When the server sends 24 bytes of TCP Payload, the segment uses SEQ = 5001. After sending, the next server sequence number becomes 5025.
+
+Layout:
+Create a horizontal TCP byte stream timeline in the center.
+
+Title:
+"Server SEQ Advance After Sending Payload"
+
+Show a timeline:
+
+Before send:
+SEQ = 5001
+
+Payload sent:
+"Hello from My TCP Stack\n"
+Length = 24 bytes
+
+Byte range:
+5001 ───────────────────────────── 5024
+
+Next SEQ:
+5025
+
+Formula:
+conn->seq += len
+conn->seq = 5001 + 24 = 5025
+
+Also show a small TCP segment card:
+TCP Segment
+Flags = PSH + ACK
+SEQ = 5001
+ACK = 1035
+Payload Length = 24 bytes
+
+Add a small note:
+"TCP SEQ advances by the number of payload bytes sent"
+"Pure ACK does not consume SEQ"
+
+Style requirements:
+- Keep the diagram minimal and readable.
+- Use green for the sent payload byte range.
+- Use blue for the TCP segment card.
+- Use orange for the Next SEQ marker.
+- Use gray for explanatory notes.
+- Avoid packet hex dumps.
+- Avoid full handshake diagrams.
+- Avoid HTTP response formatting.
+- Avoid complex topology.
+
+Required labels:
+- Server SEQ Advance
+- SEQ = 5001
+- Hello from My TCP Stack
+- Length = 24 bytes
+- 5001
+- 5024
+- Next SEQ = 5025
+- conn->seq = 5001 + 24 = 5025
+- Flags = PSH + ACK
+- ACK = 1035
+- Pure ACK does not consume SEQ
+
+Text language:
+Use English only.

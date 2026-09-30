@@ -1,0 +1,38 @@
+Create a clean educational networking diagram for a tutorial article titled "Day 20 TCP Payload Length Calculation".
+
+Diagram subject: TCP Payload Length Calculation and IPv4 Packet Memory Layout.
+
+Canvas: 16:9 landscape, crisp vector-style technical diagram, white or soft pastel light blue background, readable labels, modern flat colors, no photorealism. Consistent with Day 18 and Day 19 diagram visual theme.
+
+Header:
+- Top Left Title: "TCP Payload 長度計算 (Payload Length Calculation)"
+- Top Right Badge: "Day 20"
+- Subtitle: "利用 IPv4 總長度與各層標頭長度，精準切分並定位 TCP 資料本體 (34 Bytes)。"
+
+Main Content Layout:
+1. Top Section: IPv4 Packet Memory Layout bar / horizontal segmented container
+   - Total length container labeled: "IPv4 total_length = 74 bytes"
+   - Three distinct segmented blocks from left to right:
+     a. "IPv4 Header" | "20 bytes" (ip_hdr_len) [Soft blue block]
+     b. "TCP Header" | "20 bytes" (tcp_hdr_len, Data Offset = 5) [Teal / Cyan block]
+     c. "TCP Payload" | "34 bytes" (Data Payload) [Soft green highlighted block]
+
+2. Bottom Left Section: Calculation Formula Card
+   - Card title: "📐 長度計算公式 (Formula)"
+   - Formula steps clearly shown:
+     - payload_len = ip_total_len - ip_hdr_len - tcp_hdr_len
+     - payload_len = 74 - 20 - 20 = 34 bytes
+     - Data Offset: 5 × 4 bytes = 20 bytes (定位 Payload 起始點)
+
+3. Bottom Right Section: Payload Content Inspection Card
+   - Card title: "📄 HTTP GET 請求內容 (34 Bytes)"
+   - Monospace text box displaying:
+     GET / HTTP/1.1\r\n  (16 bytes)
+     Host: 10.0.0.2\r\n  (16 bytes)
+     \r\n                (2 bytes)
+   - Badge at bottom: "Total: 34 Bytes Payload"
+
+Style requirements:
+- Use consistent aesthetic matching Day 18/Day 19: pastel blue background, neat rounded cards, clear borders, modern tech badges.
+- Crisp Chinese and English typography.
+- Professional educational presentation.

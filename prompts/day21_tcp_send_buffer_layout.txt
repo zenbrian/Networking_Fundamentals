@@ -1,0 +1,108 @@
+Create a clean educational networking diagram for a tutorial article about TCP Data Transfer.
+
+Diagram subject:
+Show how tcp_send() dynamically builds a TCP packet in memory step by step.
+
+Canvas:
+16:9 landscape, crisp vector-style technical diagram, white or very light background, modern flat colors, no photorealism.
+
+Main idea:
+tcp_send() starts with one empty contiguous memory buffer, splits it into protocol regions with pointers, fills Ethernet / IPv4 / TCP headers, copies application data into the payload area, then writes the completed packet to TAP.
+
+Title:
+"tcp_send() Builds a Packet in Memory"
+
+Layout:
+Use a left-to-right process flow with 5 steps across the canvas.
+Each step should show the same horizontal memory buffer becoming more complete.
+
+Step 1:
+"Allocate buffer"
+Show an empty long rectangle labeled:
+buffer[total_len]
+Small label:
+total_len = 14 + 20 + 20 + 24
+
+Step 2:
+"Split by pointers"
+Show the rectangle divided into four regions:
+eth | ip | tcp | payload
+Add pointer labels:
+eth = buffer
+ip = buffer + 14
+tcp = buffer + 14 + 20
+payload = tcp + 20
+
+Step 3:
+"Fill headers"
+Show the first three regions filled with color:
+Ethernet Header
+IPv4 Header
+TCP Header
+Keep the payload region still empty.
+Small labels:
+IPv4 total_length = 64
+TCP Flags = PSH + ACK
+data_offset = 5
+
+Step 4:
+"Copy application data"
+Show a source data box above:
+"Hello from My TCP Stack\n"
+Draw an arrow into the payload region labeled:
+memcpy(payload, data, len)
+Show payload region filled:
+TCP Payload, 24 bytes
+
+Step 5:
+"Send packet"
+Show the completed buffer going to:
+TAP / network device
+Label the arrow:
+write(fd, buffer, total_len)
+
+Important note:
+Add a small callout:
+"data_offset stays 5: it describes TCP header length only"
+
+Style requirements:
+- Make the progression visually obvious.
+- Use arrows between steps.
+- Use the same buffer shape repeated or transformed across steps.
+- Use blue for headers.
+- Use green for payload.
+- Use orange for action arrows.
+- Use gray for pointer labels and notes.
+- Keep text large and readable.
+- Avoid packet hex dumps.
+- Avoid TCP handshake diagrams.
+- Avoid HTTP response formatting.
+- Avoid overly detailed code blocks.
+
+Required labels:
+- tcp_send()
+- Allocate buffer
+- buffer[total_len]
+- total_len = 14 + 20 + 20 + 24
+- Split by pointers
+- eth = buffer
+- ip = buffer + 14
+- tcp = buffer + 14 + 20
+- payload = tcp + 20
+- Fill headers
+- Ethernet Header
+- IPv4 Header
+- TCP Header
+- IPv4 total_length = 64
+- TCP Flags = PSH + ACK
+- data_offset = 5
+- Copy application data
+- Hello from My TCP Stack
+- memcpy(payload, data, len)
+- TCP Payload, 24 bytes
+- write(fd, buffer, total_len)
+- TAP / network device
+- data_offset stays 5
+
+Text language:
+Use English only.

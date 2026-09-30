@@ -1,0 +1,39 @@
+Create a clean educational networking diagram for a tutorial article titled "Day 20 TCP ACK Number Calculation".
+
+Diagram subject: TCP Cumulative ACK Number Calculation and Byte Stream Progress.
+
+Canvas: 16:9 landscape, crisp vector-style technical diagram, white or soft pastel light blue background, readable labels, modern flat colors, no photorealism. Consistent with Day 18 and Day 19 diagram visual theme.
+
+Header:
+- Top Left Title: "TCP 確認號計算 (ACK Number Calculation)"
+- Top Right Badge: "Day 20"
+- Subtitle: "基於位元組流（Byte Stream）的累積確認：收到 34 Bytes 資料後，計算應回覆的 ACK (1035)。"
+
+Main Content Layout:
+1. Top Section: Client Data Transmission & Byte Stream Stream Bar
+   - "Client 發送帶有資料的 TCP 封包"
+   - Parameters: "SEQ = 1001", "Payload Length = 34 bytes"
+   - Horizontal byte stream bar:
+     - Range labeled: "收到的位元組區間: 1001 ───────────────────────── 1034 (共 34 Bytes)"
+     - Next expected marker / arrow pointing to right edge: "下一個期待的位元組: 1035"
+
+2. Bottom Left Section: ACK Calculation Card
+   - Card title: "📐 累積確認公式 (Cumulative ACK Formula)"
+   - Formula steps clearly shown:
+     - ACK = received_seq + payload_len
+     - ACK = 1001 + 34 = 1035
+   - Explanation note: "代表伺服器宣告：1034 以前的資料全部收妥，請下次從 1035 開始送！"
+
+3. Bottom Right Section: Server Pure ACK Response Card
+   - Card title: "📤 伺服器回傳純 ACK 封包 (Pure ACK)"
+   - Parameter rows:
+     - Flags = ACK (0x10)
+     - SEQ = 5001 (Server 目前序號)
+     - ACK = 1035 (確認號碼)
+     - Payload = 0 bytes (純確認無負載)
+   - Badge at bottom: "連線維持在 ESTABLISHED"
+
+Style requirements:
+- Use consistent aesthetic matching Day 18/Day 19: pastel blue background, neat rounded cards, clear borders, modern tech badges.
+- Crisp Chinese and English typography.
+- Professional educational presentation.

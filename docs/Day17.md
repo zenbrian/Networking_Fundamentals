@@ -19,6 +19,8 @@ TCP Header (Ports, SEQ, ACK, Flags, Window)
 
 今天（Day 17），我們要補上 TCP 連線管理的核心：**TCP Socket Table** 與 **TCP State Machine**。從這一天開始，TCP 不只是「看懂封包」，而是能記錄哪個 Port 正在監聽、哪一條連線正在建立。
 
+![Day17 TCP 交握目前進度](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day17/Day17_1.png)
+
 ---
 
 # 今日學習目標與成果
@@ -334,8 +336,6 @@ Frame length: 54 bytes
                                         LISTEN              SYN_RECEIVED
                                       (服務接待處)           (新連線建立中)
 ```
-
-![Day17 TCP 交握目前進度](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day17/Day17_1.png)
 
 ---
 
