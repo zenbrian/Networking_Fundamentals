@@ -1,0 +1,84 @@
+Create a clean educational programming diagram for a networking tutorial about socket receive buffers.
+
+Diagram subject:
+How socket_recv() reads part of the TCP receive buffer and then memmove() shifts the remaining bytes to the front.
+
+Canvas:
+16:9 landscape, crisp vector-style technical diagram, white or very light background, modern flat colors, no photorealism.
+
+Main idea:
+A TCP receive buffer contains "Hello World". The application calls socket_recv(buf, 5), so it receives "Hello". The remaining bytes " World" stay in the receive buffer and are shifted to the front with memmove(). recv_len changes from 11 to 6.
+
+Layout:
+Use three horizontal steps stacked vertically.
+
+Step 1 title:
+Initial receive buffer
+
+Show an array of cells with indexes:
+0 1 2 3 4 5 6 7 8 9 10
+
+Data cells:
+[H][e][l][l][o][space][W][o][r][l][d]
+Label:
+recv_len = 11
+
+Step 2 title:
+socket_recv(buf, 5)
+
+Show an arrow from the first five cells [H][e][l][l][o] to an Application box.
+Application box label:
+Application receives "Hello"
+
+Show the remaining data:
+Remaining bytes: " World" (6 bytes)
+
+Step 3 title:
+memmove remaining bytes to front
+
+Show the receive buffer after compaction:
+Indexes:
+0 1 2 3 4 5
+
+Data cells:
+[space][W][o][r][l][d]
+Label:
+recv_len = 6
+Next read starts at recv_buf[0]
+
+Add a small note:
+"recv_buf[0] is always the next unread byte"
+
+Style requirements:
+- Keep text large and readable.
+- Use blue for receive buffer cells.
+- Use green for the Application box.
+- Use orange arrows for socket_recv() and memmove().
+- Use gray for indexes and notes.
+- Avoid code blocks.
+- Avoid packet diagrams.
+- Avoid TCP handshake.
+- Clearly show the space character as [space].
+
+Required labels:
+- Receive Buffer
+- Initial receive buffer
+- socket_recv(buf, 5)
+- Application receives "Hello"
+- Remaining bytes: " World" (6 bytes)
+- memmove remaining bytes to front
+- recv_len = 11
+- recv_len = 6
+- Next read starts at recv_buf[0]
+- recv_buf[0] is always the next unread byte
+- H
+- e
+- l
+- o
+- space
+- W
+- r
+- d
+
+Text language:
+Use English only.

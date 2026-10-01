@@ -18,8 +18,14 @@
 #include "config.h"   // <-- 引入 LOCAL_IP 定義
 #include "udp.h"
 #include "tcp.h"
+#include "socket.h"
 
 static int global_tap_fd = -1;
+
+int get_tap_fd(void)
+{
+    return global_tap_fd;
+}
 
 /* 第一個 UDP 應用程式：收到什麼就印出什麼，並觸發 udp_send 回應 9999 Port */
 void udp_echo_app(const uint8_t *data, size_t len)
@@ -76,142 +82,169 @@ int tun_alloc(char *dev)
     return fd;
 }
 
-int main()
+
+void net_init(void)
 {
     char dev[IFNAMSIZ] = "tap0";
-    unsigned char buffer[2048];
-
     int fd = tun_alloc(dev);
     global_tap_fd = fd;
-    
-    // ARP table 初始化
+
     arp_table_init();
-    
-    // 路由表初始化
     routing_init();
-    routing_add(inet_addr("10.0.0.0"), inet_addr("255.255.255.0"), 0); // 區網直連
-    routing_add(inet_addr("0.0.0.0"), inet_addr("0.0.0.0"), inet_addr("10.0.0.1")); // 預設閘道
-    routing_dump(); // 印出路由表
+    routing_add(inet_addr("10.0.0.0"), inet_addr("255.255.255.0"), 0);
+    routing_add(inet_addr("0.0.0.0"), inet_addr("0.0.0.0"), inet_addr("10.0.0.1"));
     udp_init();
-    udp_bind(8080,udp_echo_app);
+    udp_bind(8080, udp_echo_app);
     tcp_init();
-    tcp_listen(8080);
 
     printf("TAP device: %s (UP)\n", dev);
-    printf("Ethernet header size: %lu bytes\n", sizeof(struct ethernet_hdr));
-    printf("Waiting for Ethernet frame...\n");
+    printf("TCP/IP Stack Initialized.\n");
     fflush(stdout);
+}
 
-    while (1) {
-        // ★ 使用 select 讓網卡每 100ms 醒來一次檢查重傳
-        fd_set fds;
-        FD_ZERO(&fds);
-        FD_SET(fd, &fds);
-        struct timeval tv = { .tv_sec = 0, .tv_usec = 100000 }; // 100ms
-        int sel = select(fd + 1, &fds, NULL, NULL, &tv);
-        // 每隔 100ms 或每次有封包進出時，檢查一次超時重傳
-        tcp_check_time_wait();
-        tcp_check_retransmission(fd);
-        if (sel <= 0) {
-            continue; // 超時或被信號中斷，回到迴圈頂端繼續計時
-        }
-        int n = read(fd, buffer, sizeof(buffer));
+int net_poll(void)
+{
+    int fd = global_tap_fd;
+    if (fd < 0) return -1;
 
-        if (n < 0) {
-            perror("read");
-            break;
-        }
+    unsigned char buffer[2048];
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(fd, &fds);
+    struct timeval tv = { .tv_sec = 0, .tv_usec = 100000 }; // 100ms 超時
 
-        if (n < ETH_HEADER_LEN) {
-            printf("Invalid Ethernet frame\n");
-            fflush(stdout);
-            continue;
-        }
+    int sel = select(fd + 1, &fds, NULL, NULL, &tv);
 
-        struct ethernet_hdr *eth = (struct ethernet_hdr *)buffer;
+    // 每隔 100ms 醒來一次檢查重傳與 TIME_WAIT
+    tcp_check_time_wait();
+    tcp_check_retransmission(fd);
 
-        if (!ethernet_accept_frame(eth)) {
-            printf("[DROP] Not for me\n");
-            fflush(stdout);
-            continue;
-        }
-
-        printf("[ACCEPT]\n");
-        ethernet_print_header(eth);
-
-        // Ethernet EtherType 分流器 (Dispatcher)
-        const uint8_t *payload = buffer + ETH_HEADER_LEN;
-        size_t payload_len = n - ETH_HEADER_LEN;
-
-        switch (ntohs(eth->ethertype)) {
-            case ETHERTYPE_ARP:
-                arp_receive(fd, payload, payload_len);
-                break;
-
-            case ETHERTYPE_IPV4:
-                if (payload_len >= sizeof(struct ipv4_hdr)) {
-                    // 1. 去掉 const，因為我們要修改 ip->ttl 的值
-                    struct ipv4_hdr *ip = (struct ipv4_hdr *)payload;
-                    ipv4_print_header(ip);
-                    // 2. 扣減 TTL，若歸零則丟棄封包
-                    if (ipv4_decrement_ttl(ip) != 0) {
-                        printf("[IPv4] TTL Expired\n");
-                        icmp_send_time_exceeded(fd, buffer, n);
-                        fflush(stdout);
-                        break; // 跳出 switch，不往下處理 protocol
-                    }
-                    // --- 從這裡開始加入 Routing 判斷 ---
-                    uint32_t my_ip = *(uint32_t *)LOCAL_IP; // 10.0.0.2
-                    if (ip->dst_ip == my_ip) {
-                        // 目的 IP 是我：Local Delivery 本地接收
-                        printf("[IPv4] Local Delivery (for me)\n");
-                        fflush(stdout);
-                        // IPv4 Protocol Dispatcher
-                        switch (ip->protocol) {
-                            case IPPROTO_ICMP:
-                                icmp_receive(fd, buffer, n);
-                                break;
-                            case IPPROTO_UDP:
-                                udp_receive(fd, buffer, n);
-                                break;
-                            case IPPROTO_TCP:
-                                tcp_receive(fd, buffer, n);
-                                break;
-                            default:
-                                break;
-                        }
-                    }else {
-                        // 目的 IP 不是我：進入 Routing 路由查詢！
-                        printf("[IPv4] Not for me -> Routing Lookup\n");
-                        fflush(stdout);
-                        struct route *r = routing_lookup(ip->dst_ip);
-                        if (r == NULL) {
-                            printf("[IPv4] No route -> DROP\n");
-                            fflush(stdout);
-                            break;
-                        }
-                        if (r->gateway == 0) {
-                            printf("[IPv4] Route found: Direct delivery on local network\n");
-                        } else {
-                            char gw_str[INET_ADDRSTRLEN];
-                            inet_ntop(AF_INET, &r->gateway, gw_str, sizeof(gw_str));
-                            printf("[IPv4] Route found: Forward via Gateway %s\n", gw_str);
-                        }
-                        fflush(stdout);
-                        }
-                }
-                break;
-                
-
-            default:
-                printf("Unknown EtherType: 0x%04x\n", ntohs(eth->ethertype));
-                break;
-        }
-
-        printf("Frame length: %d bytes\n\n", n);
-        fflush(stdout);
+    if (sel <= 0) {
+        return 0; // 超時或被中斷，結束這次 poll
     }
 
-    close(fd);
+    int n = read(fd, buffer, sizeof(buffer));
+    if (n < 0) {
+        perror("read");
+        return -1;
+    }
+
+    if (n < ETH_HEADER_LEN) {
+        printf("Invalid Ethernet frame\n");
+        fflush(stdout);
+        return 0;
+    }
+
+    struct ethernet_hdr *eth = (struct ethernet_hdr *)buffer;
+    if (!ethernet_accept_frame(eth)) {
+        printf("[DROP] Not for me\n");
+        fflush(stdout);
+        return 0;
+    }
+
+    printf("[ACCEPT]\n");
+    ethernet_print_header(eth);
+
+    // Ethernet EtherType 分流器 (Dispatcher)
+    const uint8_t *payload = buffer + ETH_HEADER_LEN;
+    size_t payload_len = n - ETH_HEADER_LEN;
+
+    switch (ntohs(eth->ethertype)) {
+        case ETHERTYPE_ARP:
+            arp_receive(fd, payload, payload_len);
+            break;
+
+        case ETHERTYPE_IPV4:
+            if (payload_len >= sizeof(struct ipv4_hdr)) {
+                struct ipv4_hdr *ip = (struct ipv4_hdr *)payload;
+                ipv4_print_header(ip);
+
+                if (ipv4_decrement_ttl(ip) != 0) {
+                    printf("[IPv4] TTL Expired\n");
+                    icmp_send_time_exceeded(fd, buffer, n);
+                    fflush(stdout);
+                    break;
+                }
+
+                uint32_t my_ip = *(uint32_t *)LOCAL_IP; // 10.0.0.2
+                if (ip->dst_ip == my_ip) {
+                    printf("[IPv4] Local Delivery (for me)\n");
+                    fflush(stdout);
+                    switch (ip->protocol) {
+                        case IPPROTO_ICMP:
+                            icmp_receive(fd, buffer, n);
+                            break;
+                        case IPPROTO_UDP:
+                            udp_receive(fd, buffer, n);
+                            break;
+                        case IPPROTO_TCP:
+                            tcp_receive(fd, buffer, n);
+                            break;
+                        default:
+                            break;
+                    }
+                } else {
+                    printf("[IPv4] Not for me -> Routing Lookup\n");
+                    fflush(stdout);
+                    struct route *r = routing_lookup(ip->dst_ip);
+                    if (r == NULL) {
+                        printf("[IPv4] No route -> DROP\n");
+                        fflush(stdout);
+                        break;
+                    }
+                    if (r->gateway == 0) {
+                        printf("[IPv4] Route found: Direct delivery on local network\n");
+                    } else {
+                        char gw_str[INET_ADDRSTRLEN];
+                        inet_ntop(AF_INET, &r->gateway, gw_str, sizeof(gw_str));
+                        printf("[IPv4] Route found: Forward via Gateway %s\n", gw_str);
+                    }
+                    fflush(stdout);
+                }
+            }
+            break;
+
+        default:
+            printf("Unknown EtherType: 0x%04x\n", ntohs(eth->ethertype));
+            break;
+    }
+
+    printf("Frame length: %d bytes\n\n", n);
+    fflush(stdout);
+    return 1; // 成功處理了一個封包！
+}
+
+
+int main()
+{
+    // 1. 初始化底層網路
+    net_init();
+
+    // 2. 用你的 Socket API 架設伺服器
+    struct socket *listener = socket_create();
+    socket_bind(listener, 8080);
+    socket_listen(listener);
+
+    printf("\n========================================\n");
+    printf("   Echo Server Running on Port 8080   \n");
+    printf("========================================\n\n");
+
+    // 3. 經典 Echo Server 主迴圈
+    while (1) {
+        struct socket *conn = socket_accept(listener);
+        if (!conn) continue;
+
+        uint8_t buf[1024];
+        int n = socket_recv(conn, buf, sizeof(buf) - 1);
+        if (n > 0) {
+            buf[n] = '\0';
+            printf("\n[Echo Server] Received: %s\n", buf);
+            socket_send(conn, buf, n);
+        }
+
+        socket_close(conn);
+    }
+
     return 0;
 }
+

@@ -1,0 +1,93 @@
+Create a clean educational networking diagram for a tutorial article about building a teaching Socket API on top of a custom TCP/IP stack.
+
+Diagram subject:
+Socket API abstraction boundary between application code and the custom TCP/IP stack.
+
+Canvas:
+16:9 landscape, crisp vector-style technical diagram, white or very light background, modern flat colors, no photorealism.
+
+Main idea:
+Applications such as Echo Server and HTTP Web Server do not directly parse Ethernet, IPv4, or TCP packets. They call a simplified POSIX-like Socket API. The Socket API hides the custom TCP/IP stack and the TAP device details.
+
+Layout:
+Use a vertical layered architecture diagram with four stacked horizontal blocks.
+
+Block 1: Application Layer
+Labels:
+- Echo Server
+- HTTP Web Server
+- Business logic only
+- receive data
+- send bytes
+
+Block 2: Socket API Boundary
+Labels:
+- Socket API boundary
+- socket_create()
+- socket_bind()
+- socket_listen()
+- socket_accept()
+- socket_recv()
+- socket_send()
+- socket_close()
+
+Block 3: Custom TCP/IP Stack
+Labels:
+- Three-Way Handshake
+- SEQ / ACK
+- Retransmission
+- Reassembly
+- Four-Way Teardown
+- TCP Checksum
+
+Block 4: NIC Driver / TAP
+Labels:
+- read(fd, ...)
+- write(fd, ...)
+- Ethernet dispatch
+- TAP device
+
+Show downward arrows between the blocks:
+Application calls Socket API
+Socket API drives TCP/IP Stack
+TCP/IP Stack reads/writes TAP frames
+
+Style requirements:
+- Keep the diagram clean and readable.
+- Use green for Application Layer.
+- Use blue for Socket API Boundary.
+- Use orange for Custom TCP/IP Stack.
+- Use gray for NIC Driver / TAP.
+- Use minimal text inside each block.
+- Avoid packet hex dumps.
+- Avoid kernel internals.
+- Avoid photorealism.
+- Avoid too many small labels.
+
+Required labels:
+- Application Layer
+- Echo Server
+- HTTP Web Server
+- Business logic only
+- Socket API boundary
+- socket_create()
+- socket_bind()
+- socket_listen()
+- socket_accept()
+- socket_recv()
+- socket_send()
+- socket_close()
+- Custom TCP/IP Stack
+- Three-Way Handshake
+- SEQ / ACK
+- Retransmission
+- Reassembly
+- Four-Way Teardown
+- TCP Checksum
+- NIC Driver / TAP
+- read(fd, ...)
+- write(fd, ...)
+- Ethernet dispatch
+
+Text language:
+Use English only.

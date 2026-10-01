@@ -12,8 +12,6 @@
 #include "arp.h"    // 取得 arp_get_mac
 #include "arp_table.h"
 
-#define MAX_TCP_SOCKETS 64
-
 static struct tcp_socket tcp_table[MAX_TCP_SOCKETS];
 
 /* 輔助函式：取得當前系統時間 (毫秒 ms) */
@@ -219,6 +217,10 @@ static void process_buffered_fragments(struct tcp_socket *conn)
                 
                 // 交付給應用程式印出
                 tcp_dump_payload(conn->fragments[i].data, conn->fragments[i].len);
+                if (conn->recv_len + conn->fragments[i].len <= sizeof(conn->recv_buf)) {
+                    memcpy(conn->recv_buf + conn->recv_len, conn->fragments[i].data, conn->fragments[i].len);
+                    conn->recv_len += conn->fragments[i].len;
+                }
                 // 更新 expected_seq 與標記位子空出
                 conn->expected_seq += conn->fragments[i].len;
                 conn->fragments[i].used = 0;
@@ -253,6 +255,7 @@ int tcp_resend_segment(int fd, struct tcp_socket *conn, struct tcp_segment *seg)
     tcp->flags = TCP_ACK | TCP_PSH;
     tcp->window = htons(4096);
     tcp->checksum = 0;
+    tcp->checksum = tcp_checksum(conn->dst_ip, conn->src_ip, tcp, sizeof(struct tcp_hdr) + seg->len);
     tcp->urgent_ptr = 0;
 
     // 封裝 IPv4 Header
@@ -366,7 +369,10 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
             return;
         }
         printf("[TCP] Incoming SYN on Port %u\n", dst_port);
-        struct tcp_socket *conn = tcp_create_connection(ip->src_ip, ip->dst_ip, src_port, dst_port);
+        struct tcp_socket *conn = tcp_find_connection(ip->src_ip, ip->dst_ip, src_port, dst_port);
+        if (conn == NULL) {
+            conn = tcp_create_connection(ip->src_ip, ip->dst_ip, src_port, dst_port);
+        }
         if (conn == NULL) {
             printf("[TCP] Connection table full!\n");
             return;
@@ -448,27 +454,30 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
                     // 情況一：按順序到達 (In-Order)
                     printf("[TCP Reassembly] Packet In-Order! Delivering to application...\n");
                     tcp_dump_payload(payload, payload_len);
+                    if (conn->recv_len + payload_len <= sizeof(conn->recv_buf)) {
+                        memcpy(conn->recv_buf + conn->recv_len, payload, payload_len);
+                        conn->recv_len += payload_len;
+                    }
 
                     // 1. 推進期待序號
                     conn->expected_seq += payload_len;
 
                     // 2. 檢查並處理暫存區裡的亂序封包 (連鎖反應)
                     process_buffered_fragments(conn);
-
-                    // ★ 收到正常依序的請求，回送回應資料（存入 send_buffer 供後續測試重傳）
-                    tcp_send_data(fd, conn);
+                    
+                    // ★ 收到正常依序的請求，回送回應資料
 
                     // ★ 若 Client 請求中包含 "CLOSE" 關鍵字，觸發 Server 主動關閉
-                    int trigger_close = 0;
-                    for (size_t k = 0; k + 5 <= payload_len; k++) {
-                        if (memcmp(payload + k, "CLOSE", 5) == 0) {
-                            trigger_close = 1;
-                            break;
-                        }
-                    }
-                    if (trigger_close) {
-                        tcp_close(fd, conn);
-                    }
+                    // int trigger_close = 0;
+                    // for (size_t k = 0; k + 5 <= payload_len; k++) {
+                    //     if (memcmp(payload + k, "CLOSE", 5) == 0) {
+                    //         trigger_close = 1;
+                    //         break;
+                    //     }
+                    // }
+                    // if (trigger_close) {
+                    //     tcp_close(fd, conn);
+                    // }
 
                 } else if (received_seq > conn->expected_seq) {
                     // 情況二：亂序封包 (Out-of-Order / Future Packet)
@@ -561,6 +570,7 @@ int tcp_send_syn_ack(int fd, struct tcp_socket *conn){
     tcp->window = htons(4096); // 客戶端通常會給很大
     tcp->flags = (TCP_ACK | TCP_SYN);
     tcp->checksum = 0;
+    tcp->checksum = tcp_checksum(conn->dst_ip, conn->src_ip, tcp, sizeof(struct tcp_hdr));
     tcp->urgent_ptr = 0;
     //3. 封裝 Layer 3: IPv4 Header
     ip->version_ihl = (4 << 4) | 5;
@@ -613,6 +623,7 @@ int tcp_send_ack(int fd, struct tcp_socket *conn)
     tcp->window = htons(4096);
     tcp->flags = TCP_ACK; // 純 ACK Flag
     tcp->checksum = 0;
+    tcp->checksum = tcp_checksum(conn->dst_ip, conn->src_ip, tcp, sizeof(struct tcp_hdr));
     tcp->urgent_ptr = 0;
 
     // 3. 封裝 Layer 3: IPv4 Header
@@ -672,6 +683,7 @@ int tcp_send_fin(int fd, struct tcp_socket *conn)
     tcp->window = htons(4096);
     tcp->flags = TCP_FIN | TCP_ACK; // ★ 關鍵：帶上 FIN 與 ACK
     tcp->checksum = 0;
+    tcp->checksum = tcp_checksum(conn->dst_ip, conn->src_ip, tcp, sizeof(struct tcp_hdr));
     tcp->urgent_ptr = 0;
 
     // 3. 封裝 IPv4 Header
@@ -737,6 +749,7 @@ int tcp_send(int fd, struct tcp_socket *conn, const uint8_t *data, size_t len){
     tcp->flags = TCP_ACK | TCP_PSH;        // ACK + PSH
     tcp->window = htons(4096);
     tcp->checksum = 0;
+    tcp->checksum = tcp_checksum(conn->dst_ip, conn->src_ip, tcp, sizeof(struct tcp_hdr) + len);
     tcp->urgent_ptr = 0;
 
     //封裝IPv4
@@ -862,6 +875,13 @@ void tcp_check_time_wait(void)
         }
     }
 }
+
+struct tcp_socket* tcp_get_socket(int index){
+    if(index < 0 || index >= MAX_TCP_SOCKETS)
+        return NULL;
+    return &tcp_table[index];
+}
+
 
 
 

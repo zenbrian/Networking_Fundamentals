@@ -16,6 +16,8 @@
 #define TCP_ACK 0x10
 #define TCP_URG 0x20
 
+#define MAX_TCP_SOCKETS 64
+
 /* TCP Header 結構 (RFC 793 - 固定最小 20 Bytes) */
 struct tcp_hdr
 {
@@ -92,6 +94,10 @@ struct tcp_socket
     int dup_ack_count;         // 重複 ACK 的累計次數
     /* ★ TIME_WAIT 計時器 */
     uint64_t time_wait_start;  // 進入 TIME_WAIT 的時間戳記 (毫秒) 
+
+    /* ★ 接收緩衝區 (Receive Buffer) */
+    uint8_t recv_buf[8192];
+    size_t recv_len;
 };
 
 /* 印出 TCP 標頭資訊 */
@@ -116,6 +122,9 @@ int tcp_send_fin(int fd, struct tcp_socket *conn);
 /*  Day 24 主動關閉與 TIME_WAIT 函式 */
 int tcp_close(int fd, struct tcp_socket *conn);
 void tcp_check_time_wait(void);
+
+/* 新增：取得特定索引的 TCP Socket（給 Socket 層用） */
+struct tcp_socket* tcp_get_socket(int index);
 
 
 
