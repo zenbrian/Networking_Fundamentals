@@ -1,0 +1,62 @@
+Create a clean educational web server routing diagram for a tutorial article.
+
+Diagram subject:
+Simple HTTP routing from request path to response.
+
+Canvas:
+16:9 landscape, crisp vector-style technical diagram, white or very light background, modern flat colors, no photorealism.
+
+Main idea:
+The HTTP server checks req.path and returns either 200 OK for "/" or 404 Not Found for unknown paths.
+
+Layout:
+Use a left-to-right decision flow.
+
+Start:
+HTTP Request
+GET / or GET /test
+
+Decision diamond:
+req.path == "/" ?
+
+Yes branch:
+200 OK
+Content-Type: text/html
+Body:
+<h1>Hello World</h1>
+
+No branch:
+404 Not Found
+Content-Type: text/html
+Body:
+<h1>404 Not Found</h1>
+
+Both branches go to:
+http_build_response()
+socket_send()
+
+Style requirements:
+- Keep the diagram clean and readable.
+- Use blue for request.
+- Use yellow for decision.
+- Use green for 200 OK branch.
+- Use red for 404 branch.
+- Use purple for http_build_response().
+- Avoid low-level TCP details.
+- Avoid packet hex dumps.
+- Avoid too many labels.
+
+Required labels:
+- HTTP Request
+- GET /
+- GET /test
+- req.path == "/" ?
+- 200 OK
+- 404 Not Found
+- <h1>Hello World</h1>
+- <h1>404 Not Found</h1>
+- http_build_response()
+- socket_send()
+
+Text language:
+Use English only.

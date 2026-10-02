@@ -19,6 +19,7 @@
 #include "udp.h"
 #include "tcp.h"
 #include "socket.h"
+#include "http.h"
 
 static int global_tap_fd = -1;
 
@@ -226,7 +227,7 @@ int main()
     socket_listen(listener);
 
     printf("\n========================================\n");
-    printf("   Echo Server Running on Port 8080   \n");
+    printf("   HTTP Web Server Running on Port 8080   \n");
     printf("========================================\n\n");
 
     // 3. 經典 Echo Server 主迴圈
@@ -239,7 +240,21 @@ int main()
         if (n > 0) {
             buf[n] = '\0';
             printf("\n[Echo Server] Received: %s\n", buf);
-            socket_send(conn, buf, n);
+
+            struct http_request req;  // 1. 這裡需要先宣告變數 req！
+            if (http_parse_request((char *)buf, &req) == 0) { // 2. 結尾記得加分號，且判斷解析是否成功
+                http_print_request(&req);
+                char resp[1024];
+                if (strcmp(req.path, "/") == 0) {
+                    http_build_response(resp, sizeof(resp),
+                        200, "OK", "text/html", "<h1>Hello World</h1>\n");
+                } else {
+                    http_build_response(resp, sizeof(resp),
+                        404, "Not Found", "text/html", "<h1>404 Not Found</h1>\n");
+                }
+                socket_send(conn, (const uint8_t *)resp, strlen(resp));
+            }
+            
         }
 
         socket_close(conn);

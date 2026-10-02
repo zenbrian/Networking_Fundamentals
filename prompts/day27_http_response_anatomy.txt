@@ -1,0 +1,92 @@
+Create a clean educational networking diagram for a tutorial article about building an HTTP response.
+
+Diagram subject:
+HTTP Response Anatomy for a simple 200 OK HTML response.
+
+Canvas:
+16:9 landscape, crisp vector-style technical diagram, white or very light background, modern flat colors, no photorealism.
+
+Main idea:
+Show how an HTTP response is structured into Status-Line, Headers, Blank Line, and Body. Emphasize Content-Type and Content-Length.
+
+Layout:
+Draw one large vertical HTTP response card divided into four sections.
+
+Section 1:
+Status-Line
+Example:
+HTTP/1.1 200 OK
+Extracted fields:
+Version = HTTP/1.1
+Status Code = 200
+Reason Phrase = OK
+
+Section 2:
+Headers
+Examples:
+Content-Type: text/html
+Content-Length: 21
+Callouts:
+Content-Type tells browser how to render
+Content-Length is body byte length
+
+Section 3:
+Blank Line
+Show:
+\r\n
+Label:
+Headers end here
+
+Section 4:
+Body
+Example:
+<h1>Hello World</h1>
+Label:
+HTML content
+
+Add a small function box:
+http_build_response()
+Inputs:
+status_code
+content_type
+body
+Output:
+HTTP response bytes
+
+Style requirements:
+- Keep the diagram clean and readable.
+- Use blue for Status-Line.
+- Use green for Headers.
+- Use gray for Blank Line.
+- Use orange for Body.
+- Use purple for the function box.
+- Avoid TCP handshake diagrams.
+- Avoid request details.
+- Avoid packet hex dumps.
+- Keep text large.
+
+Required labels:
+- HTTP Response
+- Status-Line
+- HTTP/1.1 200 OK
+- Version = HTTP/1.1
+- Status Code = 200
+- Reason Phrase = OK
+- Headers
+- Content-Type: text/html
+- Content-Length: 21
+- Content-Type tells browser how to render
+- Content-Length is body byte length
+- Blank Line
+- Headers end here
+- Body
+- <h1>Hello World</h1>
+- HTML content
+- http_build_response()
+- status_code
+- content_type
+- body
+- HTTP response bytes
+
+Text language:
+Use English only.
