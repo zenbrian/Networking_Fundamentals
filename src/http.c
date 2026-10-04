@@ -22,6 +22,37 @@ int http_parse_request(char *buffer, struct http_request *req) {
 }
 
 
+int http_build_binary_response(
+    char *buffer,
+    size_t buffer_size,
+    int status_code,
+    const char *status_text,
+    const char *content_type,
+    const void *body,
+    size_t body_len
+) {
+    int header_len = snprintf(buffer, buffer_size,
+        "HTTP/1.1 %d %s\r\n"
+        "Content-Type: %s\r\n"
+        "Content-Length: %zu\r\n"
+        "\r\n",
+        status_code, status_text, content_type, body_len
+    );
+
+    if (header_len < 0 || (size_t)header_len >= buffer_size) {
+        return -1;
+    }
+
+    if (body && body_len > 0) {
+        if ((size_t)header_len + body_len > buffer_size) {
+            return -1; // 防止緩衝區溢位
+        }
+        memcpy(buffer + header_len, body, body_len);
+    }
+
+    return header_len + body_len;
+}
+
 int http_build_response(
     char *buffer,
     size_t buffer_size,
@@ -30,17 +61,11 @@ int http_build_response(
     const char *content_type,
     const char *body
 ) {
-    // 提示：如果傳進來的 body 是 NULL，可以防禦性設為 ""
     if (!body) body = "";
-    // 用 snprintf 組裝 Status Line、Headers 與 Body
-    // 並回傳組好的長度
-    return snprintf(buffer, buffer_size,
-        "HTTP/1.1 %d %s\r\n"
-        "Content-Type: %s\r\n"
-        "Content-Length: %zu\r\n"
-        "\r\n"
-        "%s",
-        status_code, status_text, content_type, strlen(body), body
+    return http_build_binary_response(
+        buffer, buffer_size,
+        status_code, status_text, content_type,
+        body, strlen(body)
     );
 }
 

@@ -104,7 +104,7 @@ My Network Stack
 | [Day 22](docs/Day22.md) | TCP Reassembly | 用 Sequence Number 重組資料流 |
 | [Day 23](docs/Day23.md) | TCP Retransmission | 實作 Timeout 與 Retransmit |
 | [Day 24](docs/Day24.md) | FIN | 實作 Connection Close |
-| Day 25 | Socket API | 封裝 `bind()`、`listen()`、`accept()`、`recv()`、`send()` |
+| [Day 25](docs/Day25.md) | Socket API | 封裝 `bind()`、`listen()`、`accept()`、`recv()`、`send()` |
 
 ### Phase 5：HTTP（Day 26 ~ Day 30）
 
@@ -112,11 +112,11 @@ My Network Stack
 
 | Day | 主題 | 目標 |
 |---|---|---|
-| Day 26 | HTTP Request | 解析 `GET /` |
-| Day 27 | HTTP Response | 回覆 `HTTP/1.1 200 OK` |
-| Day 28 | Dynamic Response | 產生 JSON 回應 |
-| Day 29 | Static File Server | 回傳 `index.html` |
-| Day 30 | Final Project | 完成自製 Network Stack 與 HTTP 應用整合 |
+| [Day 26](docs/Day26.md) | HTTP Request | 解析 `GET /` |
+| [Day 27](docs/Day27.md) | HTTP Response | 回覆 `HTTP/1.1 200 OK` |
+| [Day 28](docs/Day28.md) | Dynamic Response | 產生 JSON 回應 |
+| [Day 29](docs/Day29.md) | Static File Server | 回傳 `index.html` |
+| [Day 30](docs/Day30.md) | Final Project | 完成自製 Network Stack 與 HTTP 應用整合 |
 
 ---
 
@@ -124,20 +124,12 @@ My Network Stack
 
 目前已完成並整理到文件中的內容：
 
-- [x] Day 01：TAP Device
-- [x] Day 02：Ethernet Header
-- [x] Day 03：Ethernet Frame
-- [x] Day 04：ARP Request
-- [x] Day 05：ARP Reply
-- [x] Day 06：IPv4 Header
-- [x] Day 07：IPv4 Checksum
-- [x] Day 08：ICMP Header
-- [x] Day 09：Ping Reply
-- [x] Day 20：TCP Data Transfer (Part 1)
-- [x] Day 21：TCP Data Transfer (Part 2)
-- [x] Day 22：TCP Reassembly
-- [x] Day 23：TCP Retransmission
-- [x] Day 24：TCP Connection Close (Four-Way Teardown)
+- [x] Day 01 ~ Day 05：Ethernet & ARP
+- [x] Day 06 ~ Day 11：IPv4 & ICMP & Routing
+- [x] Day 12 ~ Day 15：UDP & DNS
+- [x] Day 16 ~ Day 25：TCP 核心協定全功能實作 & Socket API
+- [x] Day 26 ~ Day 29：HTTP Web Server & 靜態檔案伺服器
+- [x] Day 30：畢業專案 — 完整協定棧整合與 Wireshark 驗證 (Done!)
 
 ---
 

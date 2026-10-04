@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="920" viewBox="0 0 1100 920" role="img" aria-labelledby="title desc">
+  <title id="title">Day30 Full Network Stack Architecture</title>
+  <desc id="desc">A layered diagram showing Browser, HTTP Server, Socket API, TCP, IPv4, Ethernet, TAP device and Linux kernel.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7f9fc; }
+      .title { font: 700 34px Arial, 'Noto Sans TC', sans-serif; fill: #172033; }
+      .subtitle { font: 400 18px Arial, 'Noto Sans TC', sans-serif; fill: #4b5870; }
+      .box { rx: 14; ry: 14; stroke-width: 2; }
+      .layer { font: 700 23px Arial, 'Noto Sans TC', sans-serif; fill: #172033; }
+      .detail { font: 400 16px Consolas, 'Noto Sans TC', monospace; fill: #374151; }
+      .note { font: 600 15px Arial, 'Noto Sans TC', sans-serif; fill: #ffffff; }
+      .arrow { stroke: #59667a; stroke-width: 3; fill: none; marker-end: url(#arrowhead); }
+      .edgeText { font: 600 14px Arial, 'Noto Sans TC', sans-serif; fill: #59667a; }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="8" refX="10" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#59667a" />
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#172033" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+  <rect class="bg" width="1100" height="920"/>
+  <text class="title" x="550" y="56" text-anchor="middle">Day 30 完整自製網路協定棧</text>
+  <text class="subtitle" x="550" y="88" text-anchor="middle">從 HTTP Request 到 TAP Bytes，再回到瀏覽器渲染</text>
+
+  <g filter="url(#shadow)">
+    <rect class="box" x="210" y="125" width="680" height="76" fill="#fff8e6" stroke="#e0a321"/>
+    <text class="layer" x="550" y="156" text-anchor="middle">Web Browser / curl</text>
+    <text class="detail" x="550" y="181" text-anchor="middle">GET /  |  HTTP/1.1  |  Host: 10.0.0.2:8080</text>
+  </g>
+
+  <path class="arrow" d="M550 205 L550 246"/>
+  <text class="edgeText" x="568" y="230">HTTP Request</text>
+
+  <g filter="url(#shadow)">
+    <rect class="box" x="210" y="250" width="680" height="82" fill="#e9f7ef" stroke="#2f9e62"/>
+    <text class="layer" x="550" y="282" text-anchor="middle">HTTP Server &amp; Controller</text>
+    <text class="detail" x="550" y="307" text-anchor="middle">http.c / controller.c / www/index.html / logo.png</text>
+  </g>
+
+  <path class="arrow" d="M550 336 L550 377"/>
+  <text class="edgeText" x="568" y="361">socket_recv() / socket_send()</text>
+
+  <g filter="url(#shadow)">
+    <rect class="box" x="210" y="381" width="680" height="76" fill="#edf2ff" stroke="#4c6ef5"/>
+    <text class="layer" x="550" y="412" text-anchor="middle">Socket API Abstraction</text>
+    <text class="detail" x="550" y="437" text-anchor="middle">socket.c：listen / accept / recv / send / close</text>
+  </g>
+
+  <path class="arrow" d="M550 461 L550 502"/>
+  <text class="edgeText" x="568" y="486">byte stream + state handle</text>
+
+  <g filter="url(#shadow)">
+    <rect class="box" x="210" y="506" width="680" height="86" fill="#f3ecff" stroke="#845ef7"/>
+    <text class="layer" x="550" y="539" text-anchor="middle">TCP Transport Layer</text>
+    <text class="detail" x="550" y="564" text-anchor="middle">tcp.c：Handshake / SEQ-ACK / Retransmission / FIN / TIME_WAIT</text>
+  </g>
+
+  <path class="arrow" d="M550 596 L550 637"/>
+  <text class="edgeText" x="568" y="621">TCP segment</text>
+
+  <g filter="url(#shadow)">
+    <rect class="box" x="210" y="641" width="680" height="76" fill="#e7f5ff" stroke="#228be6"/>
+    <text class="layer" x="550" y="672" text-anchor="middle">IPv4 Network Layer</text>
+    <text class="detail" x="550" y="697" text-anchor="middle">ipv4.c / routing.c / icmp.c：Checksum / TTL / Local Delivery</text>
+  </g>
+
+  <path class="arrow" d="M550 721 L550 762"/>
+  <text class="edgeText" x="568" y="746">IP datagram</text>
+
+  <g filter="url(#shadow)">
+    <rect class="box" x="210" y="766" width="680" height="76" fill="#fff0f6" stroke="#d6336c"/>
+    <text class="layer" x="550" y="797" text-anchor="middle">Ethernet / ARP Link Layer</text>
+    <text class="detail" x="550" y="822" text-anchor="middle">ethernet.c / arp.c / arp_table.c：MAC header / EtherType / ARP mapping</text>
+  </g>
+
+  <path class="arrow" d="M550 846 L550 872"/>
+  <text class="edgeText" x="568" y="865">raw frame bytes</text>
+
+  <g>
+    <rect x="230" y="875" width="280" height="34" rx="10" fill="#343a40"/>
+    <text class="note" x="370" y="897" text-anchor="middle">TAP Device：tap.c</text>
+    <rect x="590" y="875" width="280" height="34" rx="10" fill="#495057"/>
+    <text class="note" x="730" y="897" text-anchor="middle">Linux Kernel / Real World</text>
+  </g>
+  <path d="M510 892 L590 892" stroke="#59667a" stroke-width="3" marker-end="url(#arrowhead)"/>
+</svg>

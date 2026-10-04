@@ -514,6 +514,22 @@ void tcp_receive(int fd, const uint8_t *buffer, size_t len)
             if (tcp->flags & TCP_ACK) {
                 uint32_t ack_num = ntohl(tcp->ack);
                 if (ack_num == conn->seq) {
+                    // 若對方在同一個封包同時捎帶了 FIN (Piggybacked FIN+ACK / Simultaneous Close)
+                    if (tcp->flags & TCP_FIN) {
+                        uint32_t received_seq = ntohl(tcp->seq);
+                        printf("\n========================================\n");
+                        printf("[TCP Active Close] Piggybacked Peer FIN received! (SEQ=%u, ACK=%u)\n", received_seq, ack_num);
+                        conn->ack = received_seq + payload_len + 1;
+                        printf("[TCP Active Close] Sending Final ACK -> State: TIME_WAIT\n");
+                        tcp_send_ack(fd, conn);
+                        conn->state = TCP_TIME_WAIT;
+                        conn->time_wait_start = get_current_time_ms();
+                        printf("[TCP Active Close] State -> TIME_WAIT (2-second timer started)\n");
+                        printf("========================================\n\n");
+                        tcp_dump_table();
+                        return;
+                    }
+
                     conn->state = TCP_FIN_WAIT_2;
                     printf("\n========================================\n");
                     printf("[TCP Active Close] ACK for our FIN received! (ACK=%u)\n", ack_num);

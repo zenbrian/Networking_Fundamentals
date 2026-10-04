@@ -29,4 +29,14 @@ int http_build_response(
     const char *content_type,
     const char *body
 );
+
+int http_build_binary_response(
+    char *buffer,
+    size_t buffer_size,
+    int status_code,
+    const char *status_text,
+    const char *content_type,
+    const void *body,
+    size_t body_len
+);
 #endif

@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1160" height="760" viewBox="0 0 1160 760" role="img" aria-labelledby="title desc">
+  <title id="title">Day30 Layer to Source Files Map</title>
+  <desc id="desc">A mapping table from TCP/IP layers to learning goals, implemented files, and milestone days.</desc>
+  <defs>
+    <style>
+      .bg { fill: #fbfcfe; }
+      .title { font: 700 34px Arial, 'Noto Sans TC', sans-serif; fill: #172033; }
+      .subtitle { font: 400 18px Arial, 'Noto Sans TC', sans-serif; fill: #4b5870; }
+      .header { font: 700 17px Arial, 'Noto Sans TC', sans-serif; fill: #ffffff; }
+      .layer { font: 700 22px Arial, 'Noto Sans TC', sans-serif; fill: #172033; }
+      .body { font: 400 16px Arial, 'Noto Sans TC', sans-serif; fill: #303846; }
+      .code { font: 600 15px Consolas, 'Noto Sans TC', monospace; fill: #273142; }
+      .cell { stroke: #d8dee9; stroke-width: 1.5; }
+      .badgeText { font: 700 14px Arial, 'Noto Sans TC', sans-serif; fill: #ffffff; }
+    </style>
+  </defs>
+  <rect class="bg" width="1160" height="760"/>
+  <text class="title" x="580" y="54" text-anchor="middle">Layer 對照：概念、程式檔案與 30 天路線</text>
+  <text class="subtitle" x="580" y="86" text-anchor="middle">把「瀏覽器輸入網址」拆成可實作、可測試、可抓包的模組</text>
+
+  <rect x="70" y="120" width="1020" height="44" rx="12" fill="#243b53"/>
+  <text class="header" x="165" y="148" text-anchor="middle">Layer</text>
+  <text class="header" x="410" y="148" text-anchor="middle">你學會的事</text>
+  <text class="header" x="720" y="148" text-anchor="middle">主要檔案</text>
+  <text class="header" x="990" y="148" text-anchor="middle">里程碑</text>
+
+  <g>
+    <rect class="cell" x="70" y="174" width="190" height="104" rx="10" fill="#e9f7ef"/>
+    <text class="layer" x="165" y="214" text-anchor="middle">Application</text>
+    <text class="body" x="165" y="241" text-anchor="middle">HTTP / JSON / Static File</text>
+    <rect class="cell" x="270" y="174" width="300" height="104" rx="10" fill="#ffffff"/>
+    <text class="body" x="420" y="210" text-anchor="middle">解析 Request、組 Response、讀磁碟</text>
+    <text class="body" x="420" y="238" text-anchor="middle">用 Content-Type / Length 告訴瀏覽器如何收</text>
+    <rect class="cell" x="580" y="174" width="330" height="104" rx="10" fill="#ffffff"/>
+    <text class="code" x="745" y="213" text-anchor="middle">http.c  controller.c</text>
+    <text class="code" x="745" y="241" text-anchor="middle">www/index.html  www/logo.png</text>
+    <rect class="cell" x="920" y="174" width="170" height="104" rx="10" fill="#ffffff"/>
+    <rect x="960" y="209" width="90" height="32" rx="16" fill="#2f9e62"/>
+    <text class="badgeText" x="1005" y="230" text-anchor="middle">Day 26-29</text>
+  </g>
+
+  <g>
+    <rect class="cell" x="70" y="292" width="190" height="104" rx="10" fill="#edf2ff"/>
+    <text class="layer" x="165" y="332" text-anchor="middle">Socket API</text>
+    <text class="body" x="165" y="359" text-anchor="middle">應用程式抽象介面</text>
+    <rect class="cell" x="270" y="292" width="300" height="104" rx="10" fill="#ffffff"/>
+    <text class="body" x="420" y="328" text-anchor="middle">把底層 TCP 狀態機包成</text>
+    <text class="body" x="420" y="356" text-anchor="middle">listen / accept / recv / send / close</text>
+    <rect class="cell" x="580" y="292" width="330" height="104" rx="10" fill="#ffffff"/>
+    <text class="code" x="745" y="345" text-anchor="middle">socket.c  socket.h</text>
+    <rect class="cell" x="920" y="292" width="170" height="104" rx="10" fill="#ffffff"/>
+    <rect x="964" y="327" width="82" height="32" rx="16" fill="#4c6ef5"/>
+    <text class="badgeText" x="1005" y="348" text-anchor="middle">Day 25</text>
+  </g>
+
+  <g>
+    <rect class="cell" x="70" y="410" width="190" height="104" rx="10" fill="#f3ecff"/>
+    <text class="layer" x="165" y="450" text-anchor="middle">Transport</text>
+    <text class="body" x="165" y="477" text-anchor="middle">TCP / UDP</text>
+    <rect class="cell" x="270" y="410" width="300" height="104" rx="10" fill="#ffffff"/>
+    <text class="body" x="420" y="445" text-anchor="middle">可靠傳輸、序號確認、重傳</text>
+    <text class="body" x="420" y="473" text-anchor="middle">三向交握與四向揮手</text>
+    <rect class="cell" x="580" y="410" width="330" height="104" rx="10" fill="#ffffff"/>
+    <text class="code" x="745" y="450" text-anchor="middle">tcp.c  udp.c  checksum.c</text>
+    <text class="code" x="745" y="478" text-anchor="middle">tcp.h  udp.h</text>
+    <rect class="cell" x="920" y="410" width="170" height="104" rx="10" fill="#ffffff"/>
+    <rect x="960" y="445" width="90" height="32" rx="16" fill="#845ef7"/>
+    <text class="badgeText" x="1005" y="466" text-anchor="middle">Day 12-25</text>
+  </g>
+
+  <g>
+    <rect class="cell" x="70" y="528" width="190" height="104" rx="10" fill="#e7f5ff"/>
+    <text class="layer" x="165" y="568" text-anchor="middle">Network</text>
+    <text class="body" x="165" y="595" text-anchor="middle">IPv4 / ICMP / Routing</text>
+    <rect class="cell" x="270" y="528" width="300" height="104" rx="10" fill="#ffffff"/>
+    <text class="body" x="420" y="563" text-anchor="middle">IP 封裝、Checksum、TTL</text>
+    <text class="body" x="420" y="591" text-anchor="middle">本機交付與路由查表</text>
+    <rect class="cell" x="580" y="528" width="330" height="104" rx="10" fill="#ffffff"/>
+    <text class="code" x="745" y="568" text-anchor="middle">ipv4.c  icmp.c  routing.c</text>
+    <text class="code" x="745" y="596" text-anchor="middle">ipv4.h  icmp.h  routing.h</text>
+    <rect class="cell" x="920" y="528" width="170" height="104" rx="10" fill="#ffffff"/>
+    <rect x="964" y="563" width="82" height="32" rx="16" fill="#228be6"/>
+    <text class="badgeText" x="1005" y="584" text-anchor="middle">Day 06-11</text>
+  </g>
+
+  <g>
+    <rect class="cell" x="70" y="646" width="190" height="84" rx="10" fill="#fff0f6"/>
+    <text class="layer" x="165" y="681" text-anchor="middle">Link / Device</text>
+    <text class="body" x="165" y="708" text-anchor="middle">Ethernet / ARP / TAP</text>
+    <rect class="cell" x="270" y="646" width="300" height="84" rx="10" fill="#ffffff"/>
+    <text class="body" x="420" y="681" text-anchor="middle">MAC 封裝、ARP 對應</text>
+    <text class="body" x="420" y="709" text-anchor="middle">從 /dev/net/tun 讀寫 frame</text>
+    <rect class="cell" x="580" y="646" width="330" height="84" rx="10" fill="#ffffff"/>
+    <text class="code" x="745" y="681" text-anchor="middle">ethernet.c  arp.c  arp_table.c</text>
+    <text class="code" x="745" y="709" text-anchor="middle">tap.c  config.h</text>
+    <rect class="cell" x="920" y="646" width="170" height="84" rx="10" fill="#ffffff"/>
+    <rect x="964" y="672" width="82" height="32" rx="16" fill="#d6336c"/>
+    <text class="badgeText" x="1005" y="693" text-anchor="middle">Day 01-05</text>
+  </g>
+</svg>
