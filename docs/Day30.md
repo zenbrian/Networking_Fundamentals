@@ -68,7 +68,7 @@ TAP (/dev/net/tun) ──(Frames)──> Ethernet ──(Packets)──> IPv4 �
 
 整個協定棧皆由 C 語言純手工打造，不依賴任何外部網路通訊庫：
 
-![Day30 完整自製網路協定棧架構圖](./images/Day30/Day30_1.png)
+![Day30 完整自製網路協定棧架構圖](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day30/Day30_1.png)
 
 ```text
 ┌────────────────────────────────────────────────────────┐
@@ -225,7 +225,7 @@ arp || ip.addr == 10.0.0.2 || tcp.port == 8080
 
 在 Windows Wireshark 監聽 `tap0`，發送 `curl -i http://10.0.0.2:8080/` 實測，抓取到的完整封包序列如下：
 
-![Day30 Wireshark 完整封包驗證](./images/Day30/Day30_2.png)
+![Day30 Wireshark 完整封包驗證](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day30/Day30_2.png)
 
 ### 完整封包時序清單（僅耗時 5.28 毫秒）：
 
@@ -315,7 +315,7 @@ if (conn->state == TCP_FIN_WAIT_1) {
 
 你已經能以底層實作者的視角，清晰還原每一行程式碼的運作：
 
-![Day30 TCP/IP Layer 與專案檔案對照圖](./images/Day30/Day30_3.png)
+![Day30 TCP/IP Layer 與專案檔案對照圖](https://raw.githubusercontent.com/zenbrian/Networking_Fundamentals/refs/heads/main/docs/images/Day30/Day30_3.png)
 
 1. **位址映射（ARP）**：透過廣播查詢目標 IP 的 MAC 位址，以建構二層乙太網幀頭部（Ethernet Frame Header）。
 2. **網路封裝（IPv4）**：填入來源與目的 IP，計算 16-bit One's Complement Checksum，經由路由表決定下一跳（Next Hop）。
